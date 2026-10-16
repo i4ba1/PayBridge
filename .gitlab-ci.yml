@@ -1,0 +1,15 @@
+include:
+  - local: .gitlab/ci/verify.yml
+
+stages:
+  - build
+  - test
+  - report
+
+default:
+  image: eclipse-temurin@sha256:63f965b560b905c9633218330ac3516304b526a74fdc323a504b05c06e712c30   # Temurin 25 JDK
+  interruptible: true
+
+variables:
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle-home"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"

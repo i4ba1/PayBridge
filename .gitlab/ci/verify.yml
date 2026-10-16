@@ -1,0 +1,43 @@
+# T02 skeleton. The coverage gate, container-backed tests and image jobs are switched on in T20.
+# Dependency verification and locking are always on: a changed or unknown artifact fails the build.
+
+.gradle-cache: &gradle-cache
+  cache:
+    key: gradle-$CI_COMMIT_REF_SLUG
+    paths:
+      - .gradle-home/caches/modules-2
+    policy: pull-push
+
+build:
+  stage: build
+  <<: *gradle-cache
+  script:
+    - ./gradlew --version
+    - ./gradlew assemble
+
+unit:
+  stage: test
+  <<: *gradle-cache
+  needs: [build]
+  script:
+    - ./gradlew test :integration-tests:integrationTest :integration-tests:contractTest :integration-tests:failureTest
+  artifacts:
+    when: always
+    reports:
+      junit: modules/*/build/test-results/*/TEST-*.xml
+    paths:
+      - modules/*/build/reports/tests/
+    expire_in: 14 days
+
+jacoco-report:
+  stage: report
+  <<: *gradle-cache
+  needs: [unit]
+  script:
+    - ./gradlew jacocoTestReport
+  coverage: '/Total.*?([0-9]{1,3})%/'
+  allow_failure: true   # report only until T20 sets the 90% floor on domain and application
+  artifacts:
+    paths:
+      - modules/*/build/reports/jacoco/
+    expire_in: 14 days

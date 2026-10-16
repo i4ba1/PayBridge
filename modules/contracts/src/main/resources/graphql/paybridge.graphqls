@@ -1,0 +1,330 @@
+scalar DateTime
+
+enum AuthRole { SERVICE_ANONYMOUS USER VIEWER OPERATOR ADMIN }
+enum AuthScope { NONE MERCHANT GLOBAL }
+
+"Declares the minimum authority. VIEWER and OPERATOR are evaluated in the merchant of the service context."
+directive @auth(requires: AuthRole!, scope: AuthScope = MERCHANT, audit: Boolean = false) on FIELD_DEFINITION
+
+enum PaymentStatus { REQUESTED PROCESSING SUCCEEDED FAILED UNKNOWN }
+enum ProviderOutcome { SUCCEEDED DECLINED PENDING UNKNOWN }
+enum InvoiceCollectionState { UNPAID IN_PROGRESS UNCERTAIN PAID }
+enum IneligibleReason { ACTIVE_PAYMENT UNCERTAIN_PAYMENT ALREADY_PAID }
+enum MembershipRole { OPERATOR VIEWER }
+enum ReconciliationState { OPEN ACTION_REQUIRED RESOLVED }
+enum CaseDisposition { EXTERNALLY_INVESTIGATED NO_FURTHER_ACTION_POSSIBLE }
+enum TimelineAvailability { AVAILABLE DELAYED UNAVAILABLE }
+enum ScenarioKind { SUCCESS DECLINE DELAYED_TRANSFER TIMEOUT_BEFORE_PROCESSING SUCCESS_RESPONSE_LOST }
+enum ScenarioRunState { ACTIVE EXPIRED DEACTIVATED EXHAUSTED }
+enum DependencyState { UP DEGRADED DOWN }
+enum DeadLetterState { QUARANTINED REPLAY_REQUESTED REPLAYED }
+enum FailureClass { MALFORMED INVARIANT }
+enum ReplayState { RUNNING COMPLETED FAILED }
+enum SummaryGroupBy { STATUS METHOD DAY }
+
+"Superset of the TIS ProblemCode. CSRF_INVALID and INTERNAL_ERROR are console or transport level and are not members."
+enum ProblemCode {
+  VALIDATION_ERROR NOT_FOUND FORBIDDEN IDEMPOTENCY_CONFLICT
+  INVOICE_NOT_ELIGIBLE RATE_LIMITED TEMPORARILY_UNAVAILABLE
+  UNAUTHENTICATED PASSWORD_CHANGE_REQUIRED SETUP_ALREADY_COMPLETED
+  BOOTSTRAP_TOKEN_INVALID USERNAME_TAKEN INVALID_STATE SCENARIO_NOT_AVAILABLE
+}
+type FieldProblem { field: String!, code: String!, message: String! }
+
+type OperationProblem {
+  code: ProblemCode!
+  message: String!
+  retryAfterSeconds: Int
+  fieldProblems: [FieldProblem!]
+  existingPaymentId: ID
+}
+
+type Page { nextCursor: String, limit: Int! }
+
+type Membership { merchantId: ID!, merchantName: String!, role: MembershipRole! }
+
+type Merchant { id: ID!, name: String!, currency: String!, role: String! }
+
+type User {
+  id: ID!
+  username: String!
+  displayName: String
+  admin: Boolean!
+  enabled: Boolean!
+  passwordChangeRequired: Boolean!
+  createdAt: DateTime!
+  memberships: [Membership!]!
+}
+type Payment {
+  id: ID!
+  merchantId: ID!
+  invoiceId: ID!
+  status: PaymentStatus!
+  amountMinor: String!
+  currency: String!
+  methodCode: String!
+  version: String!
+  providerReference: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  attempts: [PaymentAttempt!]!
+  uncertainty: Uncertainty
+}
+
+type PaymentAttempt {
+  attemptNumber: Int!
+  providerKey: String!
+  outcome: ProviderOutcome!
+  providerRevision: String
+  startedAt: DateTime!
+  finishedAt: DateTime
+}
+
+type Uncertainty {
+  providerMayHaveCharged: Boolean!
+  message: String!
+  nextCheckAt: DateTime
+  actionRequired: Boolean!
+  caseId: ID
+}
+
+type PaymentAccepted { payment: Payment!, replayed: Boolean! }
+union PaymentAdmission = PaymentAccepted | OperationProblem
+
+type PaymentList { items: [Payment!]!, page: Page! }
+union PaymentListResult = PaymentList | OperationProblem
+
+type Eligibility { eligible: Boolean!, reason: IneligibleReason }
+type Invoice {
+  id: ID!
+  reference: String!
+  merchantId: ID!
+  amountMinor: String!
+  currency: String!
+  collectionState: InvoiceCollectionState!
+  eligibility: Eligibility!
+  activePaymentId: ID
+}
+type InvoiceList { items: [Invoice!]!, page: Page! }
+union InvoiceListResult = InvoiceList | OperationProblem
+
+type PaymentMethod { code: String!, displayName: String!, token: String!, confirmation: String!, currencies: [String!]! }
+
+type TimelineEvent {
+  eventId: ID!
+  eventType: String!
+  aggregateVersion: String!
+  occurredAt: DateTime!
+  summary: String!
+  correlationId: String
+}
+type Timeline {
+  availability: TimelineAvailability!
+  lastProjectedVersion: String
+  projectedAt: DateTime
+  items: [TimelineEvent!]
+  page: Page
+}
+type PaymentTimelineView {
+  paymentId: ID!
+  authoritativeStatus: PaymentStatus!
+  authoritativeVersion: String!
+  timeline: Timeline!
+}
+union PaymentTimelineResult = PaymentTimelineView | OperationProblem
+
+type SummaryGroup { key: String!, count: String!, amountMinor: String!, currency: String! }
+type SummaryFreshness { source: String!, replicaLagSeconds: Int, generatedAt: DateTime! }
+type PaymentSummary { from: DateTime!, to: DateTime!, groups: [SummaryGroup!]!, freshness: SummaryFreshness! }
+union PaymentSummaryResult = PaymentSummary | OperationProblem
+
+input RequestPaymentInput {
+  invoiceId: ID!
+  methodToken: String!
+  idempotencyKey: ID!
+}
+input PaymentFilter {
+  statuses: [PaymentStatus!]
+  method: String
+  invoiceId: ID
+  from: DateTime
+  to: DateTime
+}
+type Evidence { source: String!, observedAt: DateTime!, result: String!, providerRevision: String }
+type CaseNote { id: ID!, kind: String!, text: String!, author: String!, createdAt: DateTime! }
+type ReconciliationCase {
+  id: ID!
+  paymentId: ID!
+  merchantId: ID!
+  state: ReconciliationState!
+  "PROVIDER_TIMEOUT, TRANSPORT_UNCERTAIN, PENDING_DEADLINE, RETRY_EXHAUSTED, CONFLICTING_TERMINAL, PROVIDER_IDEMPOTENCY_CONFLICT or PROVIDER_REJECTED"
+  reason: String!
+  "PROVIDER_SUCCEEDED, PROVIDER_DECLINED or INVESTIGATION_CLOSED; set only when state is RESOLVED"
+  resolution: String
+  providerKey: String!
+  checkCount: Int!
+  nextCheckAt: DateTime
+  paymentStatus: PaymentStatus!
+  evidence: [Evidence!]!
+  notes: [CaseNote!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+type CaseList { items: [ReconciliationCase!]!, page: Page! }
+union CaseListResult = CaseList | OperationProblem
+type ReconciliationRequested { reconciliationCase: ReconciliationCase!, recheckScheduled: Boolean!, coalesced: Boolean! }
+union ReconciliationRequestResult = ReconciliationRequested | OperationProblem
+type CaseNoteAdded { note: CaseNote! }
+union CaseNoteResult = CaseNoteAdded | OperationProblem
+type DispositionRecorded { reconciliationCase: ReconciliationCase! }
+union DispositionResult = DispositionRecorded | OperationProblem
+input AuthenticateInput { username: String!, password: String! }
+type Authenticated { user: User! }
+union AuthenticateResult = Authenticated | OperationProblem
+
+input BootstrapInput { bootstrapToken: String!, username: String!, displayName: String, password: String! }
+type AdministratorCreated { user: User! }
+union BootstrapResult = AdministratorCreated | OperationProblem
+
+type SetupStatus { setupRequired: Boolean! }
+
+input ChangePasswordInput { currentPassword: String!, newPassword: String! }
+type PasswordChanged { changed: Boolean! }
+union ChangePasswordResult = PasswordChanged | OperationProblem
+
+input MembershipInput { merchantId: ID!, role: MembershipRole! }
+input CreateUserInput { username: String!, displayName: String, admin: Boolean, memberships: [MembershipInput!] }
+input UpdateUserInput { displayName: String, enabled: Boolean, admin: Boolean }
+
+type UserCreated { user: User!, temporaryCredential: String! }
+union CreateUserResult = UserCreated | OperationProblem
+type UserUpdated { user: User! }
+union UpdateUserResult = UserUpdated | OperationProblem
+type PasswordReset { userId: ID!, temporaryCredential: String!, passwordChangeRequired: Boolean! }
+union ResetPasswordResult = PasswordReset | OperationProblem
+type MembershipsSet { userId: ID!, memberships: [Membership!]! }
+union SetMembershipsResult = MembershipsSet | OperationProblem
+type UserList { items: [User!]!, page: Page! }
+union UserListResult = UserList | OperationProblem
+
+type MerchantQuota { merchantId: ID!, ratePerSecond: Int!, burst: Int!, source: String!, updatedAt: DateTime, updatedBy: String }
+input QuotaInput { ratePerSecond: Int!, burst: Int!, reason: String! }
+union MerchantQuotaResult = MerchantQuota | OperationProblem
+type ExpectedOutcome { paymentStatus: PaymentStatus!, then: String!, providerEffects: Int! }
+type ScenarioRun {
+  runId: String!
+  merchantId: ID!
+  scenario: ScenarioKind!
+  delaySeconds: Int
+  state: ScenarioRunState!
+  maxUses: Int
+  usedCount: Int!
+  createdAt: DateTime!
+  expiresAt: DateTime!
+  expectedOutcome: ExpectedOutcome!
+}
+input ScenarioRunInput {
+  merchantId: ID!
+  scenario: ScenarioKind!
+  runId: String
+  delaySeconds: Int
+  maxUses: Int
+  expiresInMinutes: Int
+}
+type ScenarioRunPayload { run: ScenarioRun! }
+union ScenarioRunResult = ScenarioRunPayload | OperationProblem
+type ScenarioRunList { items: [ScenarioRun!]!, page: Page! }
+union ScenarioRunListResult = ScenarioRunList | OperationProblem
+
+type Backlog { pending: Int, runnable: Int, running: Int, expiredLeases: Int, oldestAgeSeconds: Int, oldestRunnableAgeSeconds: Int }
+type UnknownStats { count: Int!, oldestAgeSeconds: Int! }
+type ReconciliationStats { open: Int!, actionRequired: Int! }
+type ProjectionStats { mongoAvailable: Boolean!, pendingEvents: Int!, oldestPendingAgeSeconds: Int! }
+type QueueCount { queue: String!, count: Int! }
+type DeadLetterStats { total: Int!, byQueue: [QueueCount!]! }
+type Thresholds { oldestTaskSeconds: Int!, storagePercent: Int! }
+type BackpressureState { admissionOpen: Boolean!, reason: String, closeAt: Thresholds!, reopenAt: Thresholds! }
+type DependencyHealth { mysqlWriter: DependencyState!, mysqlReader: DependencyState!, redis: DependencyState!, rabbitmq: DependencyState!, mongodb: DependencyState!, provider: DependencyState! }
+type DiagnosticsOverview {
+  generatedAt: DateTime!
+  outbox: Backlog!
+  tasks: Backlog!
+  unknown: UnknownStats!
+  reconciliation: ReconciliationStats!
+  projection: ProjectionStats!
+  deadLetters: DeadLetterStats!
+  backpressure: BackpressureState!
+  dependencies: DependencyHealth!
+}
+union DiagnosticsResult = DiagnosticsOverview | OperationProblem
+
+type DeadLetter {
+  deadLetterId: ID!
+  queue: String!
+  eventId: ID!
+  eventType: String!
+  paymentId: ID
+  failureClass: FailureClass!
+  failureCount: Int!
+  sanitizedReason: String!
+  firstFailedAt: DateTime!
+  lastFailedAt: DateTime!
+  state: DeadLetterState!
+}
+type DeadLetterList { items: [DeadLetter!]!, page: Page! }
+union DeadLetterListResult = DeadLetterList | OperationProblem
+type ReplayRequested { deadLetterId: ID!, state: DeadLetterState! }
+union ReplayDeadLetterResult = ReplayRequested | OperationProblem
+
+type ProjectionReplay { replayId: ID!, merchantId: ID!, paymentId: ID, state: ReplayState!, eventsReplayed: String!, startedAt: DateTime!, finishedAt: DateTime, error: String }
+union ProjectionReplayResult = ProjectionReplay | OperationProblem
+input ProjectionReplayInput { merchantId: ID!, paymentId: ID, fromAggregateVersion: String }
+
+type AuditActor { userId: ID, username: String }
+type AuditTarget { type: String!, id: ID }
+type AuditRecord { id: ID!, occurredAt: DateTime!, actor: AuditActor!, merchantId: ID, action: String!, target: AuditTarget, result: String!, correlationId: String }
+type AuditList { items: [AuditRecord!]!, page: Page! }
+union AuditListResult = AuditList | OperationProblem
+input AuditFilter { merchantId: ID, actor: String, action: String, targetType: String, targetId: ID, from: DateTime, to: DateTime }
+type Query {
+  setupStatus: SetupStatus!                                              @auth(requires: SERVICE_ANONYMOUS, scope: NONE)
+  me: User                                                               @auth(requires: USER, scope: NONE)
+  myMerchants: [Merchant!]!                                              @auth(requires: USER, scope: NONE)
+  paymentMethods: [PaymentMethod!]!                                      @auth(requires: VIEWER)
+  invoices(state: [InvoiceCollectionState!], limit: Int, cursor: String): InvoiceListResult!  @auth(requires: VIEWER)
+  invoice(id: ID!): Invoice                                              @auth(requires: VIEWER)
+  payment(id: ID!): Payment                                              @auth(requires: VIEWER)
+  payments(filter: PaymentFilter, limit: Int, cursor: String): PaymentListResult!             @auth(requires: VIEWER)
+  paymentTimeline(paymentId: ID!, limit: Int, cursor: String): PaymentTimelineResult          @auth(requires: VIEWER)
+  paymentSummary(from: DateTime!, to: DateTime!, groupBy: SummaryGroupBy): PaymentSummaryResult! @auth(requires: VIEWER)
+  reconciliationCases(states: [ReconciliationState!], limit: Int, cursor: String): CaseListResult! @auth(requires: VIEWER)
+  reconciliationCase(id: ID!): ReconciliationCase                        @auth(requires: VIEWER)
+  users(enabled: Boolean, merchantId: ID, q: String, limit: Int, cursor: String): UserListResult! @auth(requires: ADMIN, scope: GLOBAL)
+  user(id: ID!): User                                                    @auth(requires: ADMIN, scope: GLOBAL)
+  merchantQuota(merchantId: ID!): MerchantQuotaResult!                   @auth(requires: ADMIN, scope: GLOBAL)
+  scenarioRuns(merchantId: ID, state: ScenarioRunState, limit: Int, cursor: String): ScenarioRunListResult! @auth(requires: ADMIN, scope: GLOBAL)
+  scenarioRun(runId: String!): ScenarioRunResult                         @auth(requires: ADMIN, scope: GLOBAL)
+  diagnosticsOverview: DiagnosticsResult!                                @auth(requires: ADMIN, scope: GLOBAL)
+  deadLetters(queue: String, state: DeadLetterState, limit: Int, cursor: String): DeadLetterListResult! @auth(requires: ADMIN, scope: GLOBAL)
+  projectionReplay(replayId: ID!): ProjectionReplayResult                @auth(requires: ADMIN, scope: GLOBAL)
+  auditRecords(filter: AuditFilter, limit: Int, cursor: String): AuditListResult! @auth(requires: ADMIN, scope: GLOBAL)
+}
+
+type Mutation {
+  bootstrapAdministrator(input: BootstrapInput!): BootstrapResult!       @auth(requires: SERVICE_ANONYMOUS, scope: NONE, audit: true)
+  authenticate(input: AuthenticateInput!): AuthenticateResult!           @auth(requires: SERVICE_ANONYMOUS, scope: NONE)
+  changePassword(input: ChangePasswordInput!): ChangePasswordResult!     @auth(requires: USER, scope: NONE, audit: true)
+  requestPayment(input: RequestPaymentInput!): PaymentAdmission!         @auth(requires: OPERATOR, audit: true)
+  requestReconciliation(paymentId: ID!, note: String): ReconciliationRequestResult! @auth(requires: OPERATOR, audit: true)
+  addCaseNote(caseId: ID!, text: String!): CaseNoteResult!               @auth(requires: OPERATOR, audit: true)
+  recordCaseDisposition(caseId: ID!, disposition: CaseDisposition!, text: String!): DispositionResult! @auth(requires: ADMIN, audit: true)
+  createUser(input: CreateUserInput!): CreateUserResult!                 @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+  updateUser(id: ID!, input: UpdateUserInput!): UpdateUserResult!        @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+  resetUserPassword(id: ID!): ResetPasswordResult!                       @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+  setUserMemberships(id: ID!, memberships: [MembershipInput!]!): SetMembershipsResult! @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+  setMerchantQuota(merchantId: ID!, input: QuotaInput!): MerchantQuotaResult! @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+  createScenarioRun(input: ScenarioRunInput!): ScenarioRunResult!        @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+  deactivateScenarioRun(runId: String!): ScenarioRunResult!              @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+  replayDeadLetter(deadLetterId: ID!, reason: String!): ReplayDeadLetterResult! @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+  startProjectionReplay(input: ProjectionReplayInput!): ProjectionReplayResult! @auth(requires: ADMIN, scope: GLOBAL, audit: true)
+}

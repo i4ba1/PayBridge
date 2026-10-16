@@ -1,0 +1,18 @@
+mutation RequestPayment($input: RequestPaymentInput!) {
+  requestPayment(input: $input) {
+    __typename
+    ... on PaymentAccepted {
+      replayed
+      payment {
+        id
+        status
+      }
+    }
+    ... on OperationProblem {
+      code
+      message
+      retryAfterSeconds
+      existingPaymentId
+    }
+  }
+}

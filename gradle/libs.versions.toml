@@ -13,6 +13,7 @@ spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies"
 dgs-bom = { module = "com.netflix.graphql.dgs:graphql-dgs-platform-dependencies", version.ref = "dgs" }
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 dgs-starter = { module = "com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter" }
+spring-boot-gradle-plugin = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
 apollo-runtime-java = { module = "com.apollographql.apollo:apollo-runtime-java", version.ref = "apollo" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 
