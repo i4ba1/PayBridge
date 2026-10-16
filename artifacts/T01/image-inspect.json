@@ -1,0 +1,77 @@
+[
+    {
+        "Id": "sha256:e8b1040a798bb5d2d18ffdef08aa0d4a9dcfa2f9383c3a5ae6096cfdd389409a",
+        "RepoTags": [
+            "paybridge-probe:t01"
+        ],
+        "RepoDigests": [
+            "paybridge-probe@sha256:e8b1040a798bb5d2d18ffdef08aa0d4a9dcfa2f9383c3a5ae6096cfdd389409a"
+        ],
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-10-16T12:07:48.878751732Z",
+        "Config": {
+            "User": "10001:10001",
+            "ExposedPorts": {
+                "8080/tcp": {},
+                "8081/tcp": {}
+            },
+            "Env": [
+                "PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "JAVA_HOME=/opt/java/openjdk",
+                "LANG=en_US.UTF-8",
+                "LANGUAGE=en_US:en",
+                "LC_ALL=en_US.UTF-8",
+                "JAVA_VERSION=jdk-25.0.4.1+1",
+                "JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
+            ],
+            "Entrypoint": [
+                "java",
+                "-jar",
+                "app.jar"
+            ],
+            "WorkingDir": "/app",
+            "Labels": {
+                "org.opencontainers.image.created": "2026-09-27T10:25:52.887617+00:00",
+                "org.opencontainers.image.description": "The Ubuntu container image maintained by Canonical\n\nUbuntu is a Debian-based Linux operating system that runs from the desktop to the cloud, to all your internet connected things.\nIt is the world's most popular operating system across public clouds and OpenStack clouds.\nIt is the number one platform for containers; from Docker to Kubernetes to LXD, Ubuntu can run your containers at scale.\nFast, secure and simple, Ubuntu powers millions of PCs worldwide.\n",
+                "org.opencontainers.image.title": "ubuntu",
+                "org.opencontainers.image.version": "26.04"
+            }
+        },
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 660318975,
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:f6e0e88dd8e11c81dba77d657b271e1ed7c33882e8f4dfaa7768cbaee94d94fc",
+                "sha256:f98d83061adc18abc1ffea46400be62b16d3da85c4e28563a97b3ff4cf7cca14",
+                "sha256:26f6d3a46b77e220198f0b3382d3b9f28daf9223b1998c9701a22e8911bb7453",
+                "sha256:52b30d60b6344e3658b099084dcb4d2632ae53fd0c62a007d8fddbd1c73b1db6",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:f0371f018f95482afb239583a42c16472aa7d700e9b88f64f33ba9f1c8f6d39f",
+                "sha256:e87f5e836e75d138bac3c91e22d6c507f10669a5c5189216e20744e21202f089",
+                "sha256:0fa85e9240731e162977242223e535c7be0114a0a51316c4d5f4988c9a2c9b72",
+                "sha256:f23d58463a6a6d90ff70e9b23a469085b3229eebec342ba4330c7a6bc3999519",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:d0a05faa57ab6686ce56d2bde089222b82bd0fdbb4517dcd5a296bdaf662a5d7"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-10-16T12:07:49.16916047Z"
+        },
+        "Descriptor": {
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "digest": "sha256:e8b1040a798bb5d2d18ffdef08aa0d4a9dcfa2f9383c3a5ae6096cfdd389409a",
+            "size": 856
+        },
+        "Identity": {
+            "Build": [
+                {
+                    "Ref": "l6xq3brxnjgwkl4wb7wbdfrql",
+                    "CreatedAt": "2026-10-16T12:07:49.263920779Z"
+                }
+            ]
+        }
+    }
+]

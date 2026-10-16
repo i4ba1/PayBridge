@@ -1,0 +1,21 @@
+# T01 candidate pins. Final pins are recorded in ops/toolchain.lock.yaml after the probe passes.
+[versions]
+java = "25"
+spring-boot = "3.5.16"
+dgs = "10.6.0"
+apollo = "4.4.3"
+testcontainers = "2.0.5"
+archunit = "1.5.1"
+jacoco = "0.8.15"
+
+[libraries]
+spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+dgs-bom = { module = "com.netflix.graphql.dgs:graphql-dgs-platform-dependencies", version.ref = "dgs" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+dgs-starter = { module = "com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter" }
+apollo-runtime-java = { module = "com.apollographql.apollo:apollo-runtime-java", version.ref = "apollo" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+apollo = { id = "com.apollographql.apollo", version.ref = "apollo" }

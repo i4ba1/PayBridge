@@ -1,0 +1,86 @@
+{
+  "task": "T01",
+  "date": "2026-10-16",
+  "tests": {
+    "unit": 5,
+    "integration": 6,
+    "failures": 0
+  },
+  "checks": [
+    {
+      "name": "compile --release 25",
+      "tool": "gradle 9.8.1 / JDK 25",
+      "result": "pass"
+    },
+    {
+      "name": "class-file 69",
+      "tool": "junit",
+      "result": "pass"
+    },
+    {
+      "name": "DGS ping/echo",
+      "tool": "dgs 10.6.0",
+      "result": "pass"
+    },
+    {
+      "name": "apollo codegen",
+      "tool": "apollo 4.4.3",
+      "result": "pass"
+    },
+    {
+      "name": "apollo->dgs data/error/transport",
+      "tool": "apollo 4.4.3",
+      "result": "pass"
+    },
+    {
+      "name": "flyway+jpa mysql",
+      "tool": "mysql 8.4.11",
+      "result": "pass"
+    },
+    {
+      "name": "rabbit quorum roundtrip",
+      "tool": "rabbitmq 4",
+      "result": "pass"
+    },
+    {
+      "name": "mongo upsert",
+      "tool": "mongo 8.0",
+      "result": "pass"
+    },
+    {
+      "name": "redis session",
+      "tool": "redis 7.4.11",
+      "result": "pass"
+    },
+    {
+      "name": "prometheus scrape",
+      "tool": "micrometer 1.15.12",
+      "result": "pass"
+    },
+    {
+      "name": "mockito final+record",
+      "tool": "mockito 5.17.0",
+      "result": "pass"
+    },
+    {
+      "name": "jacoco class 69",
+      "tool": "jacoco 0.8.15",
+      "result": "pass"
+    },
+    {
+      "name": "archunit",
+      "tool": "archunit 1.5.1",
+      "result": "pass"
+    },
+    {
+      "name": "image boot readiness 8s uid10001 read-only",
+      "tool": "temurin 25.0.4.1",
+      "result": "pass"
+    },
+    {
+      "name": "cold-cache rebuild with locks+verification",
+      "tool": "gradle 9.8.1",
+      "result": "pass"
+    }
+  ]
+}

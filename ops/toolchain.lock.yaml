@@ -1,0 +1,38 @@
+# T01 toolchain lock. Changing anything here requires a new compatibility run (docs/compatibility.md).
+verified_on: 2026-10-16
+status: PROBE_PASSED
+jdk:
+  build: "Oracle JDK 25+37 (Gradle toolchain 25, --release 25)"
+  runtime_image: eclipse-temurin@sha256:fd4b1c02c64eef378212e23656fc0b0caa41a357876fa0b60e51ceda94a3db64   # 25.0.4.1+1 JRE
+  preview_features: false
+build:
+  gradle: 9.8.1   # distributionSha256Sum dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f
+  dependency_locking: ops/probe/*/gradle.lockfile
+  dependency_verification: ops/probe/gradle/verification-metadata.xml
+libraries:
+  spring_boot: 3.5.16
+  dgs: 10.6.0
+  apollo_runtime_java: 4.4.3   # DEPRECATED upstream, last release of the Java runtime
+  apollo_gradle_plugin: 4.4.3
+  hibernate: 6.6.53.Final
+  flyway: 11.7.2
+  mockito: 5.17.0
+  testcontainers: 2.0.5
+  jacoco: 0.8.15
+  archunit: 1.5.1
+  mysql_connector_j: 9.7.0
+  spring_session_data_redis: 3.5.7
+  micrometer: 1.15.12
+images:   # exercised by Testcontainers in the probe
+  mysql: mysql@sha256:24989179f58856db763f418010c1169fecc944e3ec1ea7e921572d83eb070f70          # 8.4.11
+  mongodb: mongo@sha256:6657bf2413fefc5be649390318f5b4cd7328e982722f8ce2ac6dfa6f0a42cb03       # 8.0.x
+  rabbitmq: rabbitmq@sha256:b575d00b4e309e1eacc68e772298af74fe0f5672fac5b46ba698ffef379f68f7   # 4.x management
+  redis: redis@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85         # 7.4.11
+platform_candidates_unproven:   # recorded only; T03 proves them in a cluster
+  nginx_gateway_fabric: "2.8.0 (candidate)"
+  kind_node_image: TBD-T03
+  calico: TBD-T03
+  gateway_api_crds: TBD-T03
+  keda: TBD-T03
+  metrics_server: TBD-T03
+  kube_prometheus_stack: TBD-T03

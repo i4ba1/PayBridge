@@ -1,0 +1,12 @@
+type Query {
+    ping: String!
+}
+
+type Mutation {
+    echo(message: String!): EchoResult!
+}
+
+type EchoResult {
+    message: String!
+    length: Int!
+}
