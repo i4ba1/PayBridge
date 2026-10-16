@@ -1,0 +1,11 @@
+# run 1 (empty lab database, migrate role as pb_migrate over kubectl port-forward)
+INFO 77940 --- [paybridge-core] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 2 migrations (execution time 00:00.051s)
+INFO 77940 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema `paybridge` to version "001 - identity and invoices"
+INFO 77940 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema `paybridge` to version "002 - payments"
+INFO 77940 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 2 migrations to schema `paybridge`, now at version v002 (execution time 00:00.812s)
+INFO 77940 --- [paybridge-core] [           main] c.p.core.migrate.MigrationRunner         : migrate complete: 2 migration(s) applied, schema version 002, 13 grant statement(s)
+exit=0
+# run 2 (same database again: nothing to apply)
+2026-10-17T04:39:36.178+07:00  INFO 21932 --- [paybridge-core] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 2 migrations (execution time 00:00.069s)
+2026-10-17T04:39:36.547+07:00  INFO 21932 --- [paybridge-core] [           main] c.p.core.migrate.MigrationRunner         : migrate complete: 0 migration(s) applied, schema version 002, 13 grant statement(s)
+exit=0

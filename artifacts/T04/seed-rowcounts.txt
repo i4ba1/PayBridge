@@ -1,0 +1,12 @@
+table                before    after
+method_catalog            2        2
+method_token              3        3
+bootstrap_state           1        1
+merchant                  2        2
+merchant_method           4        4
+invoice                  10       10
+app_user                  4        4
+membership                4        4
+payment                   1        1
+payment_request           0        0
+audit_action              0        0

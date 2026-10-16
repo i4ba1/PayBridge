@@ -1,0 +1,25 @@
+# flyway_schema_history in the lab database
++----------------+---------+-----------------------+---------------------------------+-------------+---------+
+| installed_rank | version | description           | script                          | checksum    | success |
++----------------+---------+-----------------------+---------------------------------+-------------+---------+
+|              1 | 001     | identity and invoices | V001__identity_and_invoices.sql | -1228789198 |       1 |
+|              2 | 002     | payments              | V002__payments.sql              |  1914339983 |       1 |
++----------------+---------+-----------------------+---------------------------------+-------------+---------+
+# grants of pb_core on paybridge tables
++-----------------------+----------------------+
+| table_name            | table_priv           |
++-----------------------+----------------------+
+| app_user              | Select,Insert,Update |
+| audit_action          | Select,Insert        |
+| bootstrap_state       | Select,Insert,Update |
+| flyway_schema_history | Select               |
+| invoice               | Select,Insert,Update |
+| membership            | Select,Insert,Update |
+| merchant              | Select,Insert,Update |
+| merchant_method       | Select,Insert,Update |
+| method_catalog        | Select,Insert,Update |
+| method_token          | Select,Insert,Update |
+| payment               | Select,Insert,Update |
+| payment_attempt       | Select,Insert,Update |
+| payment_request       | Select,Insert        |
++-----------------------+----------------------+

@@ -59,3 +59,22 @@ Pins are in `ops/toolchain.lock.yaml` (`platform:`). Installed versions are reco
 - **Table-level grants** for `pb_core` and `pb_metrics` cannot be issued before the tables exist; the lab bootstrap Job creates schemas and accounts only, and T04's migration step must apply the table grants.
 - **HTTPRoute request timeout** (30 s in POR 3.6) is not configured; T21 decides whether the release honours the Gateway API `timeouts` field.
 - MongoDB lab account is created as the instance root user (`authSource=admin`); a hosted profile should create a per-database user.
+
+## T04: MySQL adapter, identity and invoice schema, seed (verified 2026-10-17)
+MySQL 8.4.11 (the digest pinned in the lock file), Hibernate 6.6.53 with `ddl-auto=validate`, Flyway 11.7.2, Connector/J 9.7.0. 101 tests pass (`artifacts/T04/test-summary.json`); 44 of them are new, 38 of those need Docker. The migrate role also ran against the lab MySQL in the kind cluster: 2 migrations applied, then 0 on the rerun (`artifacts/T04/lab-migrate-run.txt`, `lab-schema.txt`).
+
+### Findings that change the documents (DMR/POR/TIS amendments to apply)
+- **Plan and DMR disagree on V001.** The plan says `method_catalog`, `method_token` and `merchant_method` arrive with V004. DMR puts them, and `audit_action`, in V001, and the seed needs them now. V001 follows DMR. V004 keeps `reconciliation_note`, `merchant_quota_setting`, `dead_letter_record` and `system_flag`.
+- **`pb_migrate` needs `GRANT OPTION` on the `paybridge` schema.** Table-level grants for `pb_core` can only be issued after the tables exist, and the migrate role is the only thing that runs afterwards. The lab bootstrap Job now grants `ALL PRIVILEGES ... WITH GRANT OPTION` on `paybridge.*` only. The grants live in `modules/adapter-mysql/src/main/resources/db/grants/table-grants.sql` (not `ops/sql/bootstrap-users.sql` as T03 expected) and the migrate role applies them after Flyway. `TableGrantsIT` fails when a table has no `pb_core` grant, so a later migration cannot forget its grants. Hosted runbooks must give `pb_migrate` the same grant option.
+- **The seed generates the demo passwords; the installer does not.** DMR section 3 says the installer generates them and the seed reads them. The plan says the seed generates them and writes the Secret through the Kubernetes API, and the T03 RBAC (Role without `create`, pre-created empty Secret) is built for that. T04 follows the plan: only accounts created in this run get a password, the sink is called before the rows are inserted, and an existing account is never touched. `scripts/install-local.sh` (T19) must pre-create the empty Secret and must not write passwords. DMR/POR text on this point needs amending.
+- **Seed profile settings are `paybridge.seed.profile` (`base`|`demo`) and `paybridge.seed.credentials.sink` (`kubernetes`|`file`).** The chart's seed Job now sets `PAYBRIDGE_SEED_PROFILE` and `PAYBRIDGE_SEED_CREDENTIALS_SINK`.
+- **`merchant_quota_setting` is not seeded yet.** Its table arrives in V004 (T16). The demo seed adds the two quota rows then.
+- **Spring Boot's Flyway auto-configuration is disabled** (`spring.flyway.enabled=false`), otherwise every application role would migrate with its own account at startup.
+- **MySQL returns `BIGINT` for `GET_LOCK`.** Read it as a number, not an `Integer` cast.
+- **Check constraint violations surface as `UncategorizedSQLException`**, not `DataIntegrityViolationException`. Code that handles a rejected invoice must not rely on the second type.
+- **`DATETIME(6)` rounds, `Instant` does not.** The adapter clock is truncated to microseconds so a returned record equals the stored row.
+- **`CHAR(36)` columns need `@JdbcTypeCode(SqlTypes.CHAR)`** or schema validation sees `varchar`.
+
+### Not verified
+- The seed Job has not run in the cluster (no application image yet). The Kubernetes Secret sink is tested against a local fake HTTP server only, including the request path, merge-patch content type, bearer header and that no value reaches an exception message. Its in-cluster TLS setup is untested.
+- The readiness indicator is unit-tested through the health contributor, not through an HTTP `/actuator/health/readiness` call (no web server in core-app yet).

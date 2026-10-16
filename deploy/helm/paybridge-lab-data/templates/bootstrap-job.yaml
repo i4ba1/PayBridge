@@ -1,6 +1,7 @@
 {{- /* Creates the schemas and the least privilege accounts once MySQL is ready. Idempotent: passwords are re-synced.
-       Table level grants for pb_core and pb_metrics cannot exist before the tables do, so they are applied by the
-       migration step (T04) from ops/sql/bootstrap-users.sql; this Job never grants them. */ -}}
+       Table level grants for pb_core and pb_metrics cannot exist before the tables do, so the migrate role applies them
+       right after Flyway from db/grants/table-grants.sql (T04). That needs pb_migrate to hold GRANT OPTION on the
+       paybridge schema, and only there; this Job never grants table privileges itself. */ -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -41,7 +42,7 @@ spec:
 
               CREATE USER IF NOT EXISTS '$MIGRATE_USER'@'%'  IDENTIFIED BY '$MIGRATE_PASSWORD';
               ALTER  USER               '$MIGRATE_USER'@'%'  IDENTIFIED BY '$MIGRATE_PASSWORD';
-              GRANT ALL PRIVILEGES ON paybridge.* TO '$MIGRATE_USER'@'%';
+              GRANT ALL PRIVILEGES ON paybridge.* TO '$MIGRATE_USER'@'%' WITH GRANT OPTION;
 
               CREATE USER IF NOT EXISTS '$CORE_USER'@'%'     IDENTIFIED BY '$CORE_PASSWORD';
               ALTER  USER               '$CORE_USER'@'%'     IDENTIFIED BY '$CORE_PASSWORD';

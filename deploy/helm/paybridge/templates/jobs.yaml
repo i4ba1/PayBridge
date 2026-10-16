@@ -84,8 +84,8 @@ spec:
 ---
 {{- end }}
 {{- if .Values.seed.enabled }}
-{{- /* seed: post-install hook only. It is the one pod that mounts its ServiceAccount token, to update its single Secret. Idempotent; reruns through scripts/install-local.sh --reseed. The seed profile property
-       name is defined with the seed implementation (T04). */}}
+{{- /* seed: post-install hook only. It is the one pod that mounts its ServiceAccount token, to update its single Secret. Idempotent; reruns through scripts/install-local.sh --reseed. Profile and credential sink
+       are read by the seed role (paybridge.seed.profile, paybridge.seed.credentials.sink). */}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -113,6 +113,8 @@ spec:
             - configMapRef: {name: paybridge-config}
           env:
             - {name: PAYBRIDGE_ROLES, value: seed}
+            - {name: PAYBRIDGE_SEED_PROFILE, value: {{ .Values.seed.profile | quote }}}
+            - {name: PAYBRIDGE_SEED_CREDENTIALS_SINK, value: kubernetes}
             - name: PAYBRIDGE_DATASOURCE_WRITER_USERNAME
               valueFrom: {secretKeyRef: {name: {{ .Values.secrets.db }}, key: writer-username}}
             - name: PAYBRIDGE_DATASOURCE_WRITER_PASSWORD
