@@ -1,0 +1,59 @@
+{
+  "task": "T02",
+  "date": "2026-10-16",
+  "total_tests": 57,
+  "classes": {
+    "contracts/com.paybridge.contracts.PaymentEventEnvelopeTest": {
+      "tests": 4,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    },
+    "domain/com.paybridge.domain.invoice.InvoiceEligibilityTest": {
+      "tests": 2,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    },
+    "domain/com.paybridge.domain.money.MoneyScaleTest": {
+      "tests": 18,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    },
+    "domain/com.paybridge.domain.payment.PaymentTransitionTest": {
+      "tests": 27,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    },
+    "integration-tests/com.paybridge.it.ModuleBoundaryIT": {
+      "tests": 6,
+      "skipped": 0,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  "coverage": {
+    "domain": {
+      "BRANCH": {
+        "missed": 2,
+        "covered": 65
+      },
+      "LINE": {
+        "missed": 6,
+        "covered": 134
+      }
+    },
+    "contracts": {
+      "BRANCH": {
+        "missed": 1,
+        "covered": 5
+      },
+      "LINE": {
+        "missed": 1,
+        "covered": 15
+      }
+    }
+  }
+}
