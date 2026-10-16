@@ -1,0 +1,8 @@
+# NGINX Gateway Fabric install values. The data plane Service types and node ports are NOT set here:
+# they come from NginxProxy objects owned by the application chart (public: NodePort 31080/31443, internal: ClusterIP).
+nginxGateway:
+  gatewayClassName: nginx
+  gatewayControllerName: gateway.nginx.org/nginx-gateway-controller
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 256Mi}

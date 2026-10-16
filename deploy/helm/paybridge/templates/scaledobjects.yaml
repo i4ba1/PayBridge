@@ -1,0 +1,62 @@
+{{- /* relay, intake, executor and projection scale on work backlog through KEDA. minReplicaCount is always >= 1: a worker
+       must exist to drain work. Trigger parameter names are scaler-version specific and are confirmed in T18. */ -}}
+{{- $anyScaled := false }}
+{{- range $k := list "relay" "intake" "executor" "projection" }}{{- if (index $.Values.roles $k).scaling.enabled }}{{- $anyScaled = true }}{{- end }}{{- end }}
+{{- if $anyScaled }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-mysql-auth
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "keda") | nindent 4 }}
+spec:
+  secretTargetRef:
+    {{- range $p := list "host" "port" "username" "password" "dbName" }}
+    - {parameter: {{ $p }}, name: {{ $.Values.secrets.kedaMysql }}, key: {{ $p }}}
+    {{- end }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-rabbit-auth
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "keda") | nindent 4 }}
+spec:
+  secretTargetRef:
+    - {parameter: host, name: {{ .Values.secrets.kedaRabbit }}, key: httpHost}
+---
+{{- end }}
+{{- $queries := dict
+  "relay" "SELECT COUNT(*) FROM outbox WHERE status = 'PENDING' AND due_at <= UTC_TIMESTAMP(6)"
+  "executor" "SELECT COUNT(*) FROM processing_task WHERE state='PENDING' AND due_at <= UTC_TIMESTAMP(6) AND kind IN ('COLLECT','VERIFY_PENDING','RECONCILE','WEBHOOK_APPLY')" }}
+{{- $queues := dict "intake" "paybridge.collect.v1" "projection" "paybridge.projection.v1" }}
+{{- range $k := list "relay" "intake" "executor" "projection" }}
+{{- $v := index $.Values.roles $k }}
+{{- if $v.scaling.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ $k }}
+  labels:
+    {{- include "pb.labels" (dict "root" $ "component" $k) | nindent 4 }}
+spec:
+  scaleTargetRef: {name: {{ $k }}}
+  minReplicaCount: {{ $v.scaling.minReplicas }}
+  maxReplicaCount: {{ $v.scaling.maxReplicas }}
+  pollingInterval: 15
+  cooldownPeriod: 120
+  triggers:
+    {{- if hasKey $queries $k }}
+    - type: mysql
+      authenticationRef: {name: keda-mysql-auth}
+      metadata:
+        queryValue: {{ $v.scaling.targetPerReplica | quote }}
+        query: {{ index $queries $k | quote }}
+    {{- else }}
+    - type: rabbitmq
+      authenticationRef: {name: keda-rabbit-auth}
+      metadata: {protocol: http, queueName: {{ index $queues $k }}, mode: QueueLength, value: {{ $v.scaling.targetPerReplica | quote }}}
+    {{- end }}
+---
+{{- end }}
+{{- end }}

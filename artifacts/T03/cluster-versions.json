@@ -1,0 +1,11 @@
+{
+  "recordedAt": "2026-10-16T15:41:13Z",
+  "kind": "v0.33.0",
+  "helm": "v4.3.1+gc0d08d0",
+  "kubectlClient": "v1.36.1",
+  "kubernetesServer": "v1.36.4",
+  "nodeImage": "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed",
+  "gatewayApiCrds": "v1.6.3",
+  "nodes": [{"name": "paybridge-control-plane", "kubelet": "v1.36.4", "os": "Debian GNU/Linux 13 (trixie)"}, {"name": "paybridge-worker", "kubelet": "v1.36.4", "os": "Debian GNU/Linux 13 (trixie)"}, {"name": "paybridge-worker2", "kubelet": "v1.36.4", "os": "Debian GNU/Linux 13 (trixie)"}],
+  "helmReleases": [{"name": "calico", "namespace": "tigera-operator", "chart": "tigera-operator-v3.33.0", "appVersion": "v3.33.0"}, {"name": "keda", "namespace": "keda", "chart": "keda-2.21.0", "appVersion": "2.21.0"}, {"name": "metrics-server", "namespace": "kube-system", "chart": "metrics-server-3.14.0", "appVersion": "0.9.0"}, {"name": "ngf", "namespace": "nginx-gateway", "chart": "nginx-gateway-fabric-2.8.0", "appVersion": "2.8.0"}, {"name": "paybridge-lab-data", "namespace": "paybridge-data", "chart": "paybridge-lab-data-0.1.0", "appVersion": "0.1.0"}]
+}

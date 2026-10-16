@@ -1,0 +1,23 @@
+{{- /* console and core-api scale on CPU through an HPA; KEDA roles never render one (one controller per Deployment). */ -}}
+{{- range $pair := list (dict "key" "console" "name" "console") (dict "key" "coreApi" "name" "core-api") }}
+{{- $v := index $.Values.roles $pair.key }}
+{{- if $v.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $pair.name }}
+  labels:
+    {{- include "pb.labels" (dict "root" $ "component" $pair.name) | nindent 4 }}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: {{ $pair.name }}}
+  minReplicas: {{ $v.autoscaling.minReplicas }}
+  maxReplicas: {{ $v.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: {{ $v.autoscaling.cpuTarget }}}}
+  behavior:
+    scaleUp: {stabilizationWindowSeconds: 60}
+    scaleDown: {stabilizationWindowSeconds: 300}
+---
+{{- end }}
+{{- end }}

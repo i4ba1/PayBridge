@@ -1,0 +1,130 @@
+{{- /* POR 3.5 rows 8 to 25 from the data tier side. Sources are selected by namespace label and pod label, never by CIDR. */ -}}
+{{- if .Values.networkPolicy.enabled }}
+{{- $app := .Values.applicationNamespace -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mysql
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: mysql}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ $app }}}}
+          podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/component, operator: In, values: [core-api, relay, intake, executor, projection, simulator, migrate, seed, backup]}
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: keda}}      # row 21: KEDA scaler queries
+        - podSelector: {matchLabels: {app.kubernetes.io/component: bootstrap}}        # bootstrap Job in this namespace
+        - podSelector: {matchLabels: {app.kubernetes.io/name: mysql}}                 # row 23: replication peers
+      ports: [{protocol: TCP, port: 3306}, {protocol: TCP, port: 33061}]
+  egress:
+    - to: [{podSelector: {matchLabels: {app.kubernetes.io/name: mysql}}}]
+      ports: [{protocol: TCP, port: 3306}, {protocol: TCP, port: 33061}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mysql-bootstrap
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/component: bootstrap}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {matchLabels: {app.kubernetes.io/name: mysql}}}]
+      ports: [{protocol: TCP, port: 3306}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: rabbitmq}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ $app }}}}
+          podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/component, operator: In, values: [relay, intake, projection]}
+      ports: [{protocol: TCP, port: 5672}]
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: keda}}
+      ports: [{protocol: TCP, port: 15672}]
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+      ports: [{protocol: TCP, port: 15692}]
+    - from: [{podSelector: {matchLabels: {app.kubernetes.io/name: rabbitmq}}}]       # row 24: cluster peers
+      ports: [{protocol: TCP, port: 4369}, {protocol: TCP, port: 25672}]
+  egress:
+    - to: [{podSelector: {matchLabels: {app.kubernetes.io/name: rabbitmq}}}]
+      ports: [{protocol: TCP, port: 4369}, {protocol: TCP, port: 25672}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: mongodb}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ $app }}}}
+          podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/component, operator: In, values: [core-api, projection, migrate]}
+        - podSelector: {matchLabels: {app.kubernetes.io/name: mongodb}}               # row 25: replica set peers
+      ports: [{protocol: TCP, port: 27017}]
+  egress:
+    - to: [{podSelector: {matchLabels: {app.kubernetes.io/name: mongodb}}}]
+      ports: [{protocol: TCP, port: 27017}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: redis}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ $app }}}}
+          podSelector:
+            matchExpressions:
+              - {key: app.kubernetes.io/component, operator: In, values: [console, core-api, executor]}
+      ports: [{protocol: TCP, port: 6379}]
+{{- end }}

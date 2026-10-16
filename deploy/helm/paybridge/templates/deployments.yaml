@@ -1,0 +1,16 @@
+{{- $roles := fromJson (include "pb.roleTable" .) -}}
+{{- range $key := list "console" "coreApi" "relay" "intake" "executor" "projection" "simulator" }}
+{{- $def := index $roles $key }}
+{{- $v := index $.Values.roles $key }}
+{{- if or (ne $key "simulator") $v.enabled }}
+{{- $track := ternary "stable" "" (eq $key "coreApi") }}
+{{ include "pb.deployment" (dict "root" $ "key" $key "def" $def "v" $v "track" $track "name" $def.name "image" nil "replicas" $v.replicas) }}
+---
+{{- end }}
+{{- end }}
+{{- if .Values.roles.coreApi.canary.enabled }}
+{{- $def := index $roles "coreApi" }}
+{{- $v := .Values.roles.coreApi }}
+{{ include "pb.deployment" (dict "root" $ "key" "coreApi" "def" $def "v" $v "track" "canary" "name" "core-api-canary" "image" $v.canary.image "replicas" $v.canary.replicas) }}
+---
+{{- end }}

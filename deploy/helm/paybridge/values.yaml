@@ -1,0 +1,145 @@
+# Defaults for the local profile (POR section 4.2). Overlays live in deploy/environments/.
+# Never put credentials here: Secrets are referenced by name only (values.schema.json and _validate.tpl reject secrets).
+global:
+  profile: local                 # local | local-scale | vps | aws
+  environment: local             # telemetry tag env
+  domain: paybridge.localhost
+  imagePullSecrets: []
+
+images:
+  registry: ""                   # empty = images loaded into the cluster with kind load
+  pullPolicy: IfNotPresent
+  core:      {repository: paybridge-core,      tag: dev, digest: ""}
+  console:   {repository: paybridge-console,   tag: dev, digest: ""}
+  simulator: {repository: paybridge-simulator, tag: dev, digest: ""}
+
+release:
+  version: ""                    # telemetry tag version; defaults to Chart appVersion
+
+core:
+  graphqlUrl: http://core-api-stable.paybridge.svc.cluster.local:8080/graphql
+  # canary profile: http://api-internal-nginx.paybridge.svc.cluster.local:8080/graphql
+
+roles:
+  console:
+    replicas: 1
+    resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+    autoscaling: {enabled: false, minReplicas: 1, maxReplicas: 2, cpuTarget: 65}
+  coreApi:
+    replicas: 1
+    resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+    autoscaling: {enabled: false, minReplicas: 1, maxReplicas: 3, cpuTarget: 65}
+    canary: {enabled: false, replicas: 1, image: {tag: "", digest: ""}}
+  relay:
+    replicas: 1
+    resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+    scaling: {enabled: false, minReplicas: 1, maxReplicas: 2, targetPerReplica: 50}
+  intake:
+    replicas: 1
+    resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+    prefetch: 10
+    scaling: {enabled: false, minReplicas: 1, maxReplicas: 2, targetPerReplica: 10}
+  executor:
+    replicas: 1
+    resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+    claimBatch: 2
+    providerCallsPerPod: 2
+    scaling: {enabled: false, minReplicas: 1, maxReplicas: 3, targetPerReplica: 10}
+  projection:
+    replicas: 1
+    resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+    prefetch: 10
+    scaling: {enabled: false, minReplicas: 1, maxReplicas: 2, targetPerReplica: 10}
+  simulator:
+    enabled: true
+    replicas: 1
+    resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {cpu: "1", memory: 1Gi}}
+
+pools:                           # HikariCP maximumPoolSize per pod
+  coreApi: {writer: 8, reader: 4}
+  relay: 4
+  intake: 4
+  executor: 4
+  projection: 4
+  simulator: 4
+
+budgets:                         # ceilings checked by values.schema.json and templates/_validate.tpl
+  mysqlConnections: 100
+  providerConcurrency: 6
+
+timing:
+  providerTimeoutSeconds: 10
+  taskLeaseSeconds: 60
+  taskLeaseRenewSeconds: 20
+  gracefulShutdownSeconds: 30
+  terminationGracePeriodSeconds: 45
+
+admission:
+  enabled: true                  # false keeps new admission disabled (post-restore procedure)
+quota: {ratePerSecond: 20, burst: 40}
+backpressure:
+  oldestTaskAgeSeconds: 120
+  releaseTaskAgeSeconds: 60
+  storageHighWatermark: 0.80
+  storageLowWatermark: 0.70
+  storageSource: prometheus      # prometheus | disabled
+reconciliation:
+  delaysSeconds: [5, 15, 45, 120, 300]
+  jitterPercent: 20
+session: {secureCookie: false, idleTimeoutMinutes: 30}
+
+data:
+  mode: lab                      # lab (paybridge-lab-data release) | external
+  namespace: paybridge-data      # namespace of the lab data services (lab mode only)
+  mysql:   {writerHost: mysql-writer.paybridge-data.svc.cluster.local, writerPort: 3306, readerHost: mysql-reader.paybridge-data.svc.cluster.local, readerPort: 3306, schema: paybridge, simulatorSchema: paybridge_sim}
+  redis:   {host: redis.paybridge-data.svc.cluster.local, port: 6379, tls: false}
+  rabbit:  {host: rabbitmq.paybridge-data.svc.cluster.local, port: 5672, managementPort: 15672, vhost: paybridge, tls: false}
+  mongo:   {host: mongodb.paybridge-data.svc.cluster.local, port: 27017, database: paybridge, tls: false}
+
+secrets:                         # names only, never values
+  db: paybridge-db
+  redis: paybridge-redis
+  rabbit: paybridge-rabbit
+  mongo: paybridge-mongo
+  simulator: paybridge-simulator
+  serviceKeys: paybridge-service-keys
+  bootstrap: paybridge-bootstrap
+  demoAccounts: paybridge-demo-accounts
+  kedaMysql: paybridge-keda-mysql
+  kedaRabbit: paybridge-keda-rabbit
+  consoleTls: paybridge-console-tls
+  backup: paybridge-backup
+
+bootstrap: {tokenTtlHours: 24}
+seed: {enabled: true, profile: demo}
+migration: {enabled: true, activeDeadlineSeconds: 600, backoffLimit: 1}
+
+gateway:
+  className: nginx
+  console:
+    hostname: console.paybridge.localhost
+    serviceType: NodePort
+    nodePorts: {http: 31080, https: 31443}
+    nodeSelector: {paybridge/ingress: "true"}   # kind: the worker that carries the host port mappings; empty on hosted profiles
+    tls: {enabled: false, secretName: paybridge-console-tls, clusterIssuer: ""}
+    redirectHttpToHttps: false
+    maxBodySize: 1m
+    keepAliveSeconds: 60
+    rateLimit: {enabled: true, ratePerSecond: 50, burst: 100}
+  apiInternal:
+    name: api-internal
+    canary: {stableWeight: 100, canaryWeight: 0}
+
+networkPolicy: {enabled: true}
+placement: {spread: {enabled: false}}
+pdb: {enabled: true}
+monitoring:
+  serviceMonitor: {enabled: false}
+  prometheusRules: {enabled: false}
+  datadog: {enabled: false, site: ""}
+backup: {enabled: false, schedule: "0 2 * * *", retainDaily: 7}
+securityContext:
+  runAsUser: 10001
+  runAsGroup: 10001
+  readOnlyRootFilesystem: true
+  seccompProfile: RuntimeDefault

@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-headless
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "mysql") | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "lab.selector" (dict "app" "mysql") | nindent 4 }}
+  ports:
+    - {name: mysql, port: 3306}
+---
+{{- /* mysql-writer selects the current primary; mysql-reader selects the replica when one exists (T17), else the primary. */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-writer
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "mysql") | nindent 4 }}
+spec:
+  selector:
+    {{- include "lab.selector" (dict "app" "mysql") | nindent 4 }}
+    paybridge.io/mysql-role: primary
+  ports:
+    - {name: mysql, port: 3306}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-reader
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "mysql") | nindent 4 }}
+spec:
+  selector:
+    {{- include "lab.selector" (dict "app" "mysql") | nindent 4 }}
+    paybridge.io/mysql-role: primary
+  ports:
+    - {name: mysql, port: 3306}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "mysql") | nindent 4 }}
+spec:
+  serviceName: mysql-headless
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy: {whenDeleted: Retain, whenScaled: Retain}
+  selector:
+    matchLabels:
+      {{- include "lab.selector" (dict "app" "mysql") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lab.labels" (dict "root" . "app" "mysql") | nindent 8 }}
+        paybridge.io/mysql-role: primary
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/mysql-config.yaml") . | sha256sum | trunc 16 }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: mysql
+          image: {{ .Values.mysql.image | quote }}
+          ports:
+            - {name: mysql, containerPort: 3306}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.db }}, key: root-password}}
+          resources:
+            {{- toYaml .Values.mysql.resources | nindent 12 }}
+          startupProbe:
+            exec: {command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" --silent"]}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec: {command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" --silent"]}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec: {command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" --silent"]}
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/mysql}
+            - {name: config, mountPath: /etc/mysql/conf.d, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: mysql-config}
+  {{- include "lab.pvcTemplate" (dict "root" . "size" .Values.mysql.storage) | nindent 2 }}

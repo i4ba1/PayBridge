@@ -1,0 +1,69 @@
+{{- /* Lab simplification: the single application account from Secret paybridge-mongo is created as the instance root user
+       (authSource=admin). A hosted profile creates a least privilege user per database instead. */ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "mongodb") | nindent 4 }}
+spec:
+  selector:
+    {{- include "lab.selector" (dict "app" "mongodb") | nindent 4 }}
+  ports:
+    - {name: mongodb, port: 27017}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "mongodb") | nindent 4 }}
+spec:
+  serviceName: mongodb
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy: {whenDeleted: Retain, whenScaled: Retain}
+  selector:
+    matchLabels:
+      {{- include "lab.selector" (dict "app" "mongodb") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lab.labels" (dict "root" . "app" "mongodb") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mongodb
+          image: {{ .Values.mongodb.image | quote }}
+          args: ["--auth", "--bind_ip_all"]
+          ports:
+            - {name: mongodb, containerPort: 27017}
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.mongo }}, key: username}}
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.mongo }}, key: password}}
+            - {name: MONGO_INITDB_DATABASE, value: {{ .Values.mongodb.database | quote }}}
+          resources:
+            {{- toYaml .Values.mongodb.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          readinessProbe:
+            exec: {command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec: {command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]}
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - {name: data, mountPath: /data/db}
+  {{- include "lab.pvcTemplate" (dict "root" . "size" .Values.mongodb.storage) | nindent 2 }}

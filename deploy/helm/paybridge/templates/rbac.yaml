@@ -1,0 +1,68 @@
+{{- /* Seed Job: update the one Secret it owns. The install script pre-creates an empty paybridge-demo-accounts because
+       Kubernetes cannot restrict the create verb by resource name, so the role deliberately has no create. */ -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: paybridge-seed-demo-accounts
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "paybridge-seed") | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.secrets.demoAccounts | quote }}]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: paybridge-seed-demo-accounts
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "paybridge-seed") | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: paybridge-seed
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: paybridge-seed-demo-accounts
+---
+{{- /* Operator scenario role: bound to the human group paybridge-operators, never to a pod. No Secrets, no exec. */}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: paybridge-scenario-operator
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "scenario-operator") | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames: ["console", "core-api", "relay", "intake", "executor", "projection"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: paybridge-scenario-operator
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "scenario-operator") | nindent 4 }}
+subjects:
+  - kind: Group
+    name: paybridge-operators
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: paybridge-scenario-operator

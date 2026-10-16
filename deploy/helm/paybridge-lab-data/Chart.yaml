@@ -1,0 +1,7 @@
+apiVersion: v2
+name: paybridge-lab-data
+description: Local demonstration data services for PayBridge (MySQL, RabbitMQ, MongoDB, Redis). Not a production data tier; no high availability claim.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.32.0-0"

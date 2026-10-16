@@ -1,0 +1,19 @@
+{{- /* ClusterIP Services on 8080. The management port 8081 is never exposed through a Service. */ -}}
+{{- $svc := list (dict "name" "console" "component" "console" "track" "") (dict "name" "core-api-stable" "component" "core-api" "track" "stable") }}
+{{- if .Values.roles.coreApi.canary.enabled }}{{- $svc = append $svc (dict "name" "core-api-canary" "component" "core-api" "track" "canary") }}{{- end }}
+{{- if .Values.roles.simulator.enabled }}{{- $svc = append $svc (dict "name" "simulator" "component" "simulator" "track" "") }}{{- end }}
+{{- range $s := $svc }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $s.name }}
+  labels:
+    {{- include "pb.labels" (dict "root" $ "component" $s.component "track" $s.track) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "pb.selector" (dict "component" $s.component "track" $s.track) | nindent 4 }}
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+---
+{{- end }}

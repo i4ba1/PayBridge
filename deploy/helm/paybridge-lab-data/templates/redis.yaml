@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "redis") | nindent 4 }}
+spec:
+  selector:
+    {{- include "lab.selector" (dict "app" "redis") | nindent 4 }}
+  ports:
+    - {name: redis, port: 6379}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "redis") | nindent 4 }}
+spec:
+  serviceName: redis
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy: {whenDeleted: Retain, whenScaled: Retain}
+  selector:
+    matchLabels:
+      {{- include "lab.selector" (dict "app" "redis") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lab.labels" (dict "root" . "app" "redis") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image | quote }}
+          # noeviction: session and quota state is never silently evicted; a full Redis fails writes loudly (FR-051).
+          command: ["sh", "-c", "exec redis-server --requirepass \"$REDIS_PASSWORD\" --maxmemory {{ .Values.redis.maxmemory }} --maxmemory-policy noeviction --save 900 1 --dir /data"]
+          ports:
+            - {name: redis, containerPort: 6379}
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.redis }}, key: password}}
+            - name: REDISCLI_AUTH
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.redis }}, key: password}}
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          readinessProbe:
+            exec: {command: ["redis-cli", "ping"]}
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            exec: {command: ["redis-cli", "ping"]}
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
+          volumeMounts:
+            - {name: data, mountPath: /data}
+  {{- include "lab.pvcTemplate" (dict "root" . "size" .Values.redis.storage) | nindent 2 }}

@@ -1,0 +1,25 @@
+# Template rendered by scripts/cluster-local.sh. Placeholders are filled from ops/toolchain.lock.yaml
+# (node image) and from --http-port/--https-port (host ports, default 80 and 443).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: paybridge
+networking:
+  disableDefaultCNI: true       # Calico is installed so NetworkPolicies are enforced
+  podSubnet: 192.168.0.0/16
+  serviceSubnet: 10.96.0.0/12
+nodes:
+  - role: control-plane
+    image: __NODE_IMAGE__
+  - role: worker
+    image: __NODE_IMAGE__
+    labels:
+      paybridge/ingress: "true"
+    extraPortMappings:           # host -> gateway data plane NodePorts (pinned by NginxProxy)
+      - containerPort: 31080
+        hostPort: __HTTP_PORT__
+        protocol: TCP
+      - containerPort: 31443
+        hostPort: __HTTPS_PORT__
+        protocol: TCP
+  - role: worker
+    image: __NODE_IMAGE__

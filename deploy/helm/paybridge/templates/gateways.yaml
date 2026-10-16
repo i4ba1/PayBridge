@@ -1,0 +1,83 @@
+{{- /* Two Gateways in the application namespace: console-public (only public entry) and api-internal (cluster private,
+       carries the weighted route used by Apollo). NginxProxy objects set the data plane Service type. */ -}}
+{{- $c := .Values.gateway.console -}}
+apiVersion: gateway.nginx.org/v1alpha2
+kind: NginxProxy
+metadata:
+  name: public-proxy
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "console-public") | nindent 4 }}
+spec:
+  kubernetes:
+    {{- with $c.nodeSelector }}
+    deployment:
+      pod:
+        nodeSelector:
+          {{- toYaml . | nindent 10 }}
+    {{- end }}
+    service:
+      type: {{ $c.serviceType }}
+      {{- if eq $c.serviceType "NodePort" }}
+      # Local: the pod sits on the node that owns the host port mapping, which also preserves the client address
+      # for per client rate limiting. Cluster would hide every client behind the node address.
+      externalTrafficPolicy: Local
+      {{- end }}
+      {{- if eq $c.serviceType "NodePort" }}
+      nodePorts:
+        - {port: {{ $c.nodePorts.http }}, listenerPort: 80}
+        {{- if $c.tls.enabled }}
+        - {port: {{ $c.nodePorts.https }}, listenerPort: 443}
+        {{- end }}
+      {{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: console-public
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "console-public") | nindent 4 }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  infrastructure:
+    parametersRef: {group: gateway.nginx.org, kind: NginxProxy, name: public-proxy}
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      hostname: {{ $c.hostname }}
+      allowedRoutes: {namespaces: {from: Same}}
+    {{- if $c.tls.enabled }}
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: {{ $c.hostname }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - {kind: Secret, name: {{ $c.tls.secretName }}}
+      allowedRoutes: {namespaces: {from: Same}}
+    {{- end }}
+---
+apiVersion: gateway.nginx.org/v1alpha2
+kind: NginxProxy
+metadata:
+  name: internal-proxy
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "api-internal") | nindent 4 }}
+spec:
+  kubernetes:
+    service:
+      type: ClusterIP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.apiInternal.name }}
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "api-internal") | nindent 4 }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  infrastructure:
+    parametersRef: {group: gateway.nginx.org, kind: NginxProxy, name: internal-proxy}
+  listeners:
+    - {name: graphql, port: 8080, protocol: HTTP, allowedRoutes: {namespaces: {from: Same}}}

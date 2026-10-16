@@ -1,0 +1,45 @@
+NetworkPolicy enforcement test, 2026-10-16T15:24:34Z
+cluster: v1.36.4, CNI: Calico v3.33.0
+applying application chart policies for the test
+
+--- another namespace: every data service must be unreachable
+PASS  other namespace: deny (outsider -> mysql-writer.paybridge-data.svc.cluster.local:3306)
+PASS  other namespace: deny (outsider -> redis.paybridge-data.svc.cluster.local:6379)
+PASS  other namespace: deny (outsider -> rabbitmq.paybridge-data.svc.cluster.local:5672)
+PASS  other namespace: deny (outsider -> mongodb.paybridge-data.svc.cluster.local:27017)
+
+--- application namespace, pod without a role label: default deny
+PASS  unlabeled pod: deny (unlabeled -> mysql-writer.paybridge-data.svc.cluster.local:3306)
+PASS  unlabeled pod: deny (unlabeled -> redis.paybridge-data.svc.cluster.local:6379)
+PASS  unlabeled pod: deny (unlabeled -> rabbitmq.paybridge-data.svc.cluster.local:5672)
+PASS  unlabeled pod: deny (unlabeled -> mongodb.paybridge-data.svc.cluster.local:27017)
+
+--- core-api: MySQL, Redis, MongoDB allowed; RabbitMQ denied
+PASS  core-api: allow (role-core-api -> mysql-writer.paybridge-data.svc.cluster.local:3306)
+PASS  core-api: allow (role-core-api -> redis.paybridge-data.svc.cluster.local:6379)
+PASS  core-api: allow (role-core-api -> mongodb.paybridge-data.svc.cluster.local:27017)
+PASS  core-api: deny (role-core-api -> rabbitmq.paybridge-data.svc.cluster.local:5672)
+
+--- relay: MySQL and RabbitMQ allowed; Redis and MongoDB denied
+PASS  relay: allow (role-relay -> mysql-writer.paybridge-data.svc.cluster.local:3306)
+PASS  relay: allow (role-relay -> rabbitmq.paybridge-data.svc.cluster.local:5672)
+PASS  relay: deny (role-relay -> redis.paybridge-data.svc.cluster.local:6379)
+PASS  relay: deny (role-relay -> mongodb.paybridge-data.svc.cluster.local:27017)
+
+--- executor: MySQL and Redis allowed; RabbitMQ and MongoDB denied
+PASS  executor: allow (role-executor -> mysql-writer.paybridge-data.svc.cluster.local:3306)
+PASS  executor: allow (role-executor -> redis.paybridge-data.svc.cluster.local:6379)
+PASS  executor: deny (role-executor -> rabbitmq.paybridge-data.svc.cluster.local:5672)
+PASS  executor: deny (role-executor -> mongodb.paybridge-data.svc.cluster.local:27017)
+
+--- console: Redis allowed; the database tier denied (console has no database account)
+PASS  console: allow (role-console -> redis.paybridge-data.svc.cluster.local:6379)
+PASS  console: deny (role-console -> mysql-writer.paybridge-data.svc.cluster.local:3306)
+PASS  console: deny (role-console -> rabbitmq.paybridge-data.svc.cluster.local:5672)
+PASS  console: deny (role-console -> mongodb.paybridge-data.svc.cluster.local:27017)
+
+--- data tier egress: a database pod cannot reach the internet or the application namespace
+PASS  mysql egress to internet: deny (mysql-0 -> 1.1.1.1:443)
+PASS  mysql egress to application: deny (mysql-0 -> console.paybridge.svc.cluster.local:8080)
+
+RESULT: all paths behaved as specified

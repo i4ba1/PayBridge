@@ -1,0 +1,201 @@
+{{- /* POR 3.5. Default deny both directions, then one additive policy per workload listing every allowed flow.
+       Row numbers in comments refer to the flow table. Data tier ingress is enforced by the paybridge-lab-data chart. */ -}}
+{{- define "pb.npData" -}}
+{{- /* egress rule to one data service: (dict "root" $ "app" "mysql" "port" 3306) */ -}}
+- to:
+    {{- if eq .root.Values.data.mode "lab" }}
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: {{ .root.Values.data.namespace }}}}
+      podSelector: {matchLabels: {app.kubernetes.io/name: {{ .app }}}}
+    {{- else }}
+    - ipBlock: {cidr: 0.0.0.0/0}
+    {{- end }}
+  ports: [{protocol: TCP, port: {{ .port }}}]
+{{- end -}}
+
+{{- define "pb.npPods" -}}
+{{- /* peer selecting application pods: (dict "c" "core-api") */ -}}
+- podSelector: {matchLabels: {app.kubernetes.io/name: paybridge, app.kubernetes.io/component: {{ .c }}}}
+{{- end -}}
+
+{{- define "pb.npHeader" -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "pb.labels" (dict "root" .root "component" "networkpolicy") | nindent 4 }}
+{{- end -}}
+
+{{- if .Values.networkPolicy.enabled }}
+{{- $d := .Values.data -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:                                                                    # row 1
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-scrape
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: paybridge}}
+  policyTypes: [Ingress]
+  ingress:                                                                   # row 20
+    - from:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+      ports: [{protocol: TCP, port: 8081}]
+---
+{{- /* Gateway data planes run in this namespace and are selected by the gateway name label. */}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-console-public
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {gateway.networking.k8s.io/gateway-name: console-public}}
+  policyTypes: [Ingress, Egress]
+  ingress:                                                                   # row 2
+    - ports: [{protocol: TCP, port: 80}, {protocol: TCP, port: 443}]
+  egress:
+    - to:       # row 3
+        {{- include "pb.npPods" (dict "c" "console") | nindent 8 }}
+      ports: [{protocol: TCP, port: 8080}]
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: nginx-gateway}}}]   # rows 4, 5
+      ports: [{protocol: TCP, port: 8443}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-api-internal
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector: {matchLabels: {gateway.networking.k8s.io/gateway-name: {{ .Values.gateway.apiInternal.name }}}}
+  policyTypes: [Ingress, Egress]
+  ingress:                                                                   # row 6
+    - from:
+        {{- include "pb.npPods" (dict "c" "console") | nindent 8 }}
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to:      # row 7
+        {{- include "pb.npPods" (dict "c" "core-api") | nindent 8 }}
+      ports: [{protocol: TCP, port: 8080}]
+    - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: nginx-gateway}}}]   # rows 4, 5
+      ports: [{protocol: TCP, port: 8443}]
+---
+{{ include "pb.npHeader" (dict "root" . "name" "console") }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: paybridge, app.kubernetes.io/component: console}}
+  policyTypes: [Ingress, Egress]
+  ingress:                                                                   # row 3
+    - from: [{podSelector: {matchLabels: {gateway.networking.k8s.io/gateway-name: console-public}}}]
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to: [{podSelector: {matchLabels: {gateway.networking.k8s.io/gateway-name: {{ .Values.gateway.apiInternal.name }}}}}]   # row 6
+      ports: [{protocol: TCP, port: 8080}]
+    {{- include "pb.npData" (dict "root" . "app" "redis" "port" $d.redis.port) | nindent 4 }}   # row 8
+---
+{{ include "pb.npHeader" (dict "root" . "name" "core-api") }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: paybridge, app.kubernetes.io/component: core-api}}
+  policyTypes: [Ingress, Egress]
+  ingress:                                                                   # rows 7 and 17 (webhooks)
+    - from:
+        - podSelector: {matchLabels: {gateway.networking.k8s.io/gateway-name: {{ .Values.gateway.apiInternal.name }}}}
+        {{- include "pb.npPods" (dict "c" "simulator") | nindent 8 }}
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    {{- include "pb.npData" (dict "root" . "app" "mysql" "port" $d.mysql.writerPort) | nindent 4 }}     # row 9
+    {{- include "pb.npData" (dict "root" . "app" "redis" "port" $d.redis.port) | nindent 4 }}           # row 10
+    {{- include "pb.npData" (dict "root" . "app" "mongodb" "port" $d.mongo.port) | nindent 4 }}         # row 11
+    - to:        # row 12
+        {{- include "pb.npPods" (dict "c" "simulator") | nindent 8 }}
+      ports: [{protocol: TCP, port: 8080}]
+---
+{{ include "pb.npHeader" (dict "root" . "name" "relay") }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: paybridge, app.kubernetes.io/component: relay}}
+  policyTypes: [Egress]
+  egress:                                                                    # row 13
+    {{- include "pb.npData" (dict "root" . "app" "mysql" "port" $d.mysql.writerPort) | nindent 4 }}
+    {{- include "pb.npData" (dict "root" . "app" "rabbitmq" "port" $d.rabbit.port) | nindent 4 }}
+---
+{{ include "pb.npHeader" (dict "root" . "name" "intake") }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: paybridge, app.kubernetes.io/component: intake}}
+  policyTypes: [Egress]
+  egress:                                                                    # row 14
+    {{- include "pb.npData" (dict "root" . "app" "rabbitmq" "port" $d.rabbit.port) | nindent 4 }}
+    {{- include "pb.npData" (dict "root" . "app" "mysql" "port" $d.mysql.writerPort) | nindent 4 }}
+---
+{{ include "pb.npHeader" (dict "root" . "name" "executor") }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: paybridge, app.kubernetes.io/component: executor}}
+  policyTypes: [Egress]
+  egress:                                                                    # row 15
+    {{- include "pb.npData" (dict "root" . "app" "mysql" "port" $d.mysql.writerPort) | nindent 4 }}
+    {{- include "pb.npData" (dict "root" . "app" "redis" "port" $d.redis.port) | nindent 4 }}
+    - to:
+        {{- include "pb.npPods" (dict "c" "simulator") | nindent 8 }}
+      ports: [{protocol: TCP, port: 8080}]
+---
+{{ include "pb.npHeader" (dict "root" . "name" "projection") }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: paybridge, app.kubernetes.io/component: projection}}
+  policyTypes: [Egress]
+  egress:                                                                    # row 16
+    {{- include "pb.npData" (dict "root" . "app" "rabbitmq" "port" $d.rabbit.port) | nindent 4 }}
+    {{- include "pb.npData" (dict "root" . "app" "mysql" "port" $d.mysql.writerPort) | nindent 4 }}
+    {{- include "pb.npData" (dict "root" . "app" "mongodb" "port" $d.mongo.port) | nindent 4 }}
+---
+{{- if .Values.roles.simulator.enabled }}
+{{ include "pb.npHeader" (dict "root" . "name" "simulator") }}
+spec:
+  podSelector: {matchLabels: {app.kubernetes.io/name: paybridge, app.kubernetes.io/component: simulator}}
+  policyTypes: [Ingress, Egress]
+  ingress:                                                                   # rows 12 and 15
+    - from:
+        {{- include "pb.npPods" (dict "c" "core-api") | nindent 8 }}
+        {{- include "pb.npPods" (dict "c" "executor") | nindent 8 }}
+      ports: [{protocol: TCP, port: 8080}]
+  egress:                                                                    # row 17: storage and signed webhooks only
+    {{- include "pb.npData" (dict "root" . "app" "mysql" "port" $d.mysql.writerPort) | nindent 4 }}
+    - to:
+        {{- include "pb.npPods" (dict "c" "core-api") | nindent 8 }}
+      ports: [{protocol: TCP, port: 8080}]
+---
+{{- end }}
+{{ include "pb.npHeader" (dict "root" . "name" "jobs") }}
+spec:
+  podSelector:
+    matchExpressions:
+      - {key: app.kubernetes.io/component, operator: In, values: [migrate, seed]}
+  policyTypes: [Egress]
+  egress:                                                                    # row 18
+    {{- include "pb.npData" (dict "root" . "app" "mysql" "port" $d.mysql.writerPort) | nindent 4 }}
+    {{- include "pb.npData" (dict "root" . "app" "mongodb" "port" $d.mongo.port) | nindent 4 }}
+    - ports: [{protocol: TCP, port: 443}, {protocol: TCP, port: 6443}]      # seed only: update its one Secret through the API server
+{{- end }}

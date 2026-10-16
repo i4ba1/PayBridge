@@ -1,0 +1,13 @@
+{
+  "recordedAt": "2026-10-16T13:55:34Z",
+  "cpuModel": "Intel(R) Xeon(R) CPU E5-2699 v3 @ 2.30GHz",
+  "logicalCpus": 36,
+  "ramGiB": 64,
+  "diskType": "SSD",
+  "os": "Microsoft Windows 11 Pro 10.0.22000",
+  "docker": "Docker version 29.8.2, build 7fc2dff",
+  "dockerMemGiB": 31,
+  "kind": "v0.33.0",
+  "helm": "v4.3.1+gc0d08d0",
+  "java": "java version \"25\" 2025-09-16 LTS"
+}

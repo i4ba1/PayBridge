@@ -1,0 +1,6 @@
+# metrics-server. The insecure kubelet TLS argument is added by scripts/cluster-local.sh from
+# platform.metrics_server_extra_args in the lock file, for the local kind cluster only.
+replicas: 1
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {cpu: 200m, memory: 128Mi}

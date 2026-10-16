@@ -1,0 +1,83 @@
+{{- /* Creates the schemas and the least privilege accounts once MySQL is ready. Idempotent: passwords are re-synced.
+       Table level grants for pb_core and pb_metrics cannot exist before the tables do, so they are applied by the
+       migration step (T04) from ops/sql/bootstrap-users.sql; this Job never grants them. */ -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-bootstrap
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "mysql" "component" "bootstrap") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        {{- include "lab.labels" (dict "root" . "app" "mysql-bootstrap" "component" "bootstrap") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: bootstrap
+          image: {{ .Values.mysql.image | quote }}
+          command:
+            - bash
+            - -c
+            - |
+              set -euo pipefail
+              until mysqladmin ping -h mysql-writer -uroot -p"$MYSQL_ROOT_PASSWORD" --silent; do sleep 3; done
+              mysql -h mysql-writer -uroot -p"$MYSQL_ROOT_PASSWORD" <<SQL
+              CREATE DATABASE IF NOT EXISTS paybridge     CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+              CREATE DATABASE IF NOT EXISTS paybridge_sim CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+              CREATE USER IF NOT EXISTS '$MIGRATE_USER'@'%'  IDENTIFIED BY '$MIGRATE_PASSWORD';
+              ALTER  USER               '$MIGRATE_USER'@'%'  IDENTIFIED BY '$MIGRATE_PASSWORD';
+              GRANT ALL PRIVILEGES ON paybridge.* TO '$MIGRATE_USER'@'%';
+
+              CREATE USER IF NOT EXISTS '$CORE_USER'@'%'     IDENTIFIED BY '$CORE_PASSWORD';
+              ALTER  USER               '$CORE_USER'@'%'     IDENTIFIED BY '$CORE_PASSWORD';
+
+              CREATE USER IF NOT EXISTS '$READER_USER'@'%'   IDENTIFIED BY '$READER_PASSWORD';
+              ALTER  USER               '$READER_USER'@'%'   IDENTIFIED BY '$READER_PASSWORD';
+              GRANT SELECT ON paybridge.* TO '$READER_USER'@'%';
+
+              CREATE USER IF NOT EXISTS '$METRICS_USER'@'%'  IDENTIFIED BY '$METRICS_PASSWORD';
+              ALTER  USER               '$METRICS_USER'@'%'  IDENTIFIED BY '$METRICS_PASSWORD';
+
+              CREATE USER IF NOT EXISTS '$SIM_USER'@'%'      IDENTIFIED BY '$SIM_PASSWORD';
+              ALTER  USER               '$SIM_USER'@'%'      IDENTIFIED BY '$SIM_PASSWORD';
+              GRANT ALL PRIVILEGES ON paybridge_sim.* TO '$SIM_USER'@'%';
+
+              CREATE USER IF NOT EXISTS '$BACKUP_USER'@'%'   IDENTIFIED BY '$BACKUP_PASSWORD';
+              ALTER  USER               '$BACKUP_USER'@'%'   IDENTIFIED BY '$BACKUP_PASSWORD';
+              GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, RELOAD, PROCESS, REPLICATION CLIENT ON *.* TO '$BACKUP_USER'@'%';
+
+              CREATE USER IF NOT EXISTS '$REPL_USER'@'%'     IDENTIFIED BY '$REPL_PASSWORD';
+              ALTER  USER               '$REPL_USER'@'%'     IDENTIFIED BY '$REPL_PASSWORD';
+              GRANT REPLICATION SLAVE ON *.* TO '$REPL_USER'@'%';
+              SQL
+              echo "mysql bootstrap complete"
+          env:
+            {{- range $e := list (list "MYSQL_ROOT_PASSWORD" "root-password") (list "MIGRATE_USER" "migrate-username") (list "MIGRATE_PASSWORD" "migrate-password") (list "CORE_USER" "writer-username") (list "CORE_PASSWORD" "writer-password") (list "READER_USER" "reader-username") (list "READER_PASSWORD" "reader-password") (list "METRICS_USER" "metrics-username") (list "METRICS_PASSWORD" "metrics-password") (list "BACKUP_USER" "backup-username") (list "BACKUP_PASSWORD" "backup-password") (list "REPL_USER" "repl-username") (list "REPL_PASSWORD" "repl-password") }}
+            - name: {{ index $e 0 }}
+              valueFrom: {secretKeyRef: {name: {{ $.Values.secrets.db }}, key: {{ index $e 1 }}}}
+            {{- end }}
+            - name: SIM_USER
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.simulator }}, key: db-username}}
+            - name: SIM_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.simulator }}, key: db-password}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 250m, memory: 128Mi}

@@ -1,0 +1,16 @@
+# kube-prometheus-stack, minimal. Grafana stays off unless the scale demo asks for it.
+grafana:
+  enabled: false
+alertmanager:
+  enabled: false
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    resources:
+      requests: {cpu: 200m, memory: 512Mi}
+      limits: {cpu: "1", memory: 1Gi}
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources: {requests: {storage: 10Gi}}

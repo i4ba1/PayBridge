@@ -1,0 +1,9 @@
+apiVersion: v2
+name: paybridge
+description: PayBridge application chart (console, core roles, simulator, gateways, scaling and network policy)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.32.0-0"
+# paybridge-lab-data is installed as its own release by scripts/install-local.sh (namespace paybridge-data);
+# it is intentionally not a subchart because its namespace differs from the application namespace.

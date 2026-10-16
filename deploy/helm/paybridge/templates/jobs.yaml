@@ -1,0 +1,134 @@
+{{- /* migrate: pre-install and pre-upgrade hook. Hooks run before regular resources exist, so this Job carries its own
+       ServiceAccount (also a hook) and inline environment instead of the shared ConfigMap. A failed migration fails the
+       Helm operation and leaves the previous release serving. */ -}}
+{{- define "pb.jobPodSpec" -}}
+serviceAccountName: {{ .sa }}
+automountServiceAccountToken: {{ .automount }}
+restartPolicy: Never
+securityContext:
+  runAsNonRoot: true
+  runAsUser: {{ .root.Values.securityContext.runAsUser }}
+  runAsGroup: {{ .root.Values.securityContext.runAsGroup }}
+  seccompProfile:
+    type: {{ .root.Values.securityContext.seccompProfile }}
+{{- with .root.Values.global.imagePullSecrets }}
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end -}}
+
+{{- if .Values.migration.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: paybridge-migrate
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "migrate") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: paybridge-migrate
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "migrate") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "pb.labels" (dict "root" . "component" "migrate") | nindent 8 }}
+    spec:
+      {{- include "pb.jobPodSpec" (dict "root" . "sa" "paybridge-migrate" "automount" false) | nindent 6 }}
+      containers:
+        - name: migrate
+          image: {{ include "pb.image" (dict "root" . "group" "core" "override" nil) | quote }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - {name: PAYBRIDGE_ROLES, value: migrate}
+            - {name: PAYBRIDGE_ENVIRONMENT, value: {{ .Values.global.environment | quote }}}
+            - {name: PAYBRIDGE_DATASOURCE_WRITER_URL, value: {{ printf "jdbc:mysql://%s:%v/%s" .Values.data.mysql.writerHost .Values.data.mysql.writerPort .Values.data.mysql.schema | quote }}}
+            - name: PAYBRIDGE_DATASOURCE_WRITER_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.db }}, key: migrate-username}}
+            - name: PAYBRIDGE_DATASOURCE_WRITER_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.db }}, key: migrate-password}}
+            - name: MONGO_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.mongo }}, key: username}}
+            - name: MONGO_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.mongo }}, key: password}}
+            - name: PAYBRIDGE_MONGO_URI
+              value: {{ printf "mongodb://$(MONGO_USERNAME):$(MONGO_PASSWORD)@%s:%v/%s?authSource=admin" .Values.data.mongo.host .Values.data.mongo.port .Values.data.mongo.database | quote }}
+            - {name: PAYBRIDGE_MONGO_DATABASE, value: {{ .Values.data.mongo.database | quote }}}
+            - {name: MANAGEMENT_SERVER_PORT, value: "8081"}
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
+---
+{{- end }}
+{{- if .Values.seed.enabled }}
+{{- /* seed: post-install hook only. It is the one pod that mounts its ServiceAccount token, to update its single Secret. Idempotent; reruns through scripts/install-local.sh --reseed. The seed profile property
+       name is defined with the seed implementation (T04). */}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: paybridge-seed
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "seed") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "pb.labels" (dict "root" . "component" "seed") | nindent 8 }}
+    spec:
+      {{- include "pb.jobPodSpec" (dict "root" . "sa" "paybridge-seed" "automount" true) | nindent 6 }}
+      containers:
+        - name: seed
+          image: {{ include "pb.image" (dict "root" . "group" "core" "override" nil) | quote }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          envFrom:
+            - configMapRef: {name: paybridge-config}
+          env:
+            - {name: PAYBRIDGE_ROLES, value: seed}
+            - name: PAYBRIDGE_DATASOURCE_WRITER_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.db }}, key: writer-username}}
+            - name: PAYBRIDGE_DATASOURCE_WRITER_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.db }}, key: writer-password}}
+            - name: PAYBRIDGE_BOOTSTRAP_TOKEN
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.bootstrap }}, key: token}}
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
+{{- end }}

@@ -1,0 +1,9 @@
+PVC persistence test, 2026-10-16T15:40:52Z
+NAME              STATUS   SIZE   CLASS
+data-mongodb-0    Bound    10Gi   standard
+data-mysql-0      Bound    20Gi   standard
+data-rabbitmq-0   Bound    5Gi    standard
+data-redis-0      Bound    1Gi    standard
+wrote marker survives-pod-deletion-2056 to mysql-0 and mongodb-0; deleting both pods
+PASS  mysql kept the marker after pod deletion
+PASS  mongodb kept the marker after pod deletion

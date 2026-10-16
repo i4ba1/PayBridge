@@ -1,0 +1,4 @@
+# local profile: every role at one replica, no autoscaling (the chart defaults are already the local profile).
+global:
+  profile: local
+  environment: local

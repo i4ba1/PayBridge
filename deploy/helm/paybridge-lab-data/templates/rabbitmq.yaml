@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "rabbitmq") | nindent 4 }}
+data:
+  enabled_plugins: |
+    [rabbitmq_management,rabbitmq_prometheus].
+  # Queue types are chosen when queues are declared (quorum in the distributed profile); topology is owned by T09.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "rabbitmq") | nindent 4 }}
+spec:
+  selector:
+    {{- include "lab.selector" (dict "app" "rabbitmq") | nindent 4 }}
+  ports:
+    - {name: amqp, port: 5672}
+    - {name: management, port: 15672}
+    - {name: prometheus, port: 15692}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "lab.labels" (dict "root" . "app" "rabbitmq") | nindent 4 }}
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  persistentVolumeClaimRetentionPolicy: {whenDeleted: Retain, whenScaled: Retain}
+  selector:
+    matchLabels:
+      {{- include "lab.selector" (dict "app" "rabbitmq") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lab.labels" (dict "root" . "app" "rabbitmq") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: rabbitmq
+          image: {{ .Values.rabbitmq.image | quote }}
+          ports:
+            - {name: amqp, containerPort: 5672}
+            - {name: management, containerPort: 15672}
+            - {name: prometheus, containerPort: 15692}
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.rabbit }}, key: username}}
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.rabbit }}, key: password}}
+            - {name: RABBITMQ_DEFAULT_VHOST, value: {{ .Values.rabbitmq.vhost | quote }}}
+            - name: RABBITMQ_ERLANG_COOKIE
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.rabbit }}, key: erlang-cookie}}
+            - name: MONITORING_USERNAME
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.rabbit }}, key: monitoring-username}}
+            - name: MONITORING_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.rabbit }}, key: monitoring-password}}
+          resources:
+            {{- toYaml .Values.rabbitmq.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          lifecycle:
+            postStart:
+              # The monitoring account (tag monitoring, read only) is what KEDA uses against the management API.
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - |
+                    for i in $(seq 1 60); do rabbitmqctl await_startup >/dev/null 2>&1 && break; sleep 2; done
+                    rabbitmqctl add_user "$MONITORING_USERNAME" "$MONITORING_PASSWORD" >/dev/null 2>&1 \
+                      || rabbitmqctl change_password "$MONITORING_USERNAME" "$MONITORING_PASSWORD" >/dev/null 2>&1
+                    rabbitmqctl set_user_tags "$MONITORING_USERNAME" monitoring >/dev/null 2>&1
+                    rabbitmqctl set_permissions -p {{ .Values.rabbitmq.vhost }} "$MONITORING_USERNAME" '^$' '^$' '.*' >/dev/null 2>&1
+                    exit 0
+          readinessProbe:
+            exec: {command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]}
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            exec: {command: ["rabbitmq-diagnostics", "-q", "ping"]}
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/rabbitmq}
+            - {name: config, mountPath: /etc/rabbitmq/enabled_plugins, subPath: enabled_plugins, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: rabbitmq-config}
+  {{- include "lab.pvcTemplate" (dict "root" . "size" .Values.rabbitmq.storage) | nindent 2 }}

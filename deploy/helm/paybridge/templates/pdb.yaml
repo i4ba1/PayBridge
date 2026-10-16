@@ -1,0 +1,24 @@
+{{- /* A budget exists only when a role can run at least 2 replicas, so a single replica local install never blocks node drain. */ -}}
+{{- if .Values.pdb.enabled }}
+{{- $roles := fromJson (include "pb.roleTable" .) -}}
+{{- range $key := list "console" "coreApi" "relay" "intake" "executor" "projection" }}
+{{- $v := index $.Values.roles $key }}
+{{- $max := include "pb.maxReplicas" (dict "v" $v) | int }}
+{{- if and (ge $max 2) (ge (int $v.replicas) 1) (or (ge (int $v.replicas) 2) (and (hasKey $v "autoscaling") $v.autoscaling.enabled) (and (hasKey $v "scaling") $v.scaling.enabled)) }}
+{{- $def := index $roles $key }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $def.name }}
+  labels:
+    {{- include "pb.labels" (dict "root" $ "component" $def.name) | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: paybridge
+      app.kubernetes.io/component: {{ $def.name }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

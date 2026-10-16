@@ -1,0 +1,21 @@
+Gateway smoke, 2026-10-16T15:39:45Z, NGF 2.8.0, Gateway API v1.6.3
+applied chart Gateways, HTTPRoutes and edge policies
+PASS  gateway console-public is Programmed
+PASS  gateway api-internal is Programmed
+PASS  ratelimitpolicy console-edge-limit Accepted by the gateway
+PASS  clientsettingspolicy console-client-settings Accepted by the gateway
+data plane services: service/api-internal-nginx service/console-public-nginx 
+public service ports: NodePort 80:31080
+
+--- public entry on the host
+PASS  GET / with Host console.paybridge.localhost on host port 80 returns 200 from the console backend
+PASS  unknown host is not routed (HTTP 404)
+
+--- weighted private route (50/50 during this test)
+60 requests through api-internal:      31 canary      29 stable 
+PASS  both backends receive traffic (weights honoured)
+
+--- edge rate limit (50 r/s, burst 100, per client address; nginx limit_req) and body size limit (1m)
+600 parallel requests:     146 200     454 503 
+PASS  burst above the limit is rejected (503)
+PASS  2 MiB body rejected (413)

@@ -1,0 +1,222 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PayBridge application chart values",
+  "type": "object",
+  "required": ["global", "images", "roles", "pools", "budgets", "timing", "data", "secrets", "gateway"],
+  "properties": {
+    "global": {
+      "type": "object",
+      "required": ["profile", "environment"],
+      "properties": {
+        "profile": {"enum": ["local", "local-scale", "vps", "aws"]},
+        "environment": {"type": "string", "minLength": 1},
+        "domain": {"type": "string"},
+        "imagePullSecrets": {"type": "array"}
+      }
+    },
+    "images": {
+      "type": "object",
+      "required": ["pullPolicy", "core", "console", "simulator"],
+      "properties": {
+        "registry": {"type": "string"},
+        "pullPolicy": {"enum": ["IfNotPresent", "Always"]},
+        "core": {"$ref": "#/definitions/image"},
+        "console": {"$ref": "#/definitions/image"},
+        "simulator": {"$ref": "#/definitions/image"}
+      }
+    },
+    "roles": {
+      "type": "object",
+      "required": ["console", "coreApi", "relay", "intake", "executor", "projection", "simulator"],
+      "properties": {
+        "console": {"$ref": "#/definitions/hpaRole"},
+        "coreApi": {"$ref": "#/definitions/hpaRole"},
+        "relay": {"$ref": "#/definitions/kedaRole"},
+        "intake": {"$ref": "#/definitions/kedaRole"},
+        "executor": {
+          "allOf": [{"$ref": "#/definitions/kedaRole"}],
+          "properties": {
+            "claimBatch": {"type": "integer", "minimum": 1},
+            "providerCallsPerPod": {"type": "integer", "minimum": 1}
+          }
+        },
+        "projection": {"$ref": "#/definitions/kedaRole"},
+        "simulator": {
+          "type": "object",
+          "properties": {"enabled": {"type": "boolean"}, "replicas": {"type": "integer", "minimum": 1, "maximum": 1}}
+        }
+      }
+    },
+    "pools": {
+      "type": "object",
+      "properties": {
+        "coreApi": {
+          "type": "object",
+          "properties": {"writer": {"type": "integer", "minimum": 1, "maximum": 50}, "reader": {"type": "integer", "minimum": 1, "maximum": 50}}
+        },
+        "relay": {"type": "integer", "minimum": 1, "maximum": 50},
+        "intake": {"type": "integer", "minimum": 1, "maximum": 50},
+        "executor": {"type": "integer", "minimum": 1, "maximum": 50},
+        "projection": {"type": "integer", "minimum": 1, "maximum": 50},
+        "simulator": {"type": "integer", "minimum": 1, "maximum": 50}
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "required": ["mysqlConnections", "providerConcurrency"],
+      "properties": {
+        "mysqlConnections": {"type": "integer", "minimum": 1, "maximum": 100},
+        "providerConcurrency": {"type": "integer", "minimum": 1}
+      }
+    },
+    "timing": {
+      "type": "object",
+      "properties": {
+        "providerTimeoutSeconds": {"type": "integer", "minimum": 1},
+        "taskLeaseSeconds": {"type": "integer", "minimum": 3},
+        "taskLeaseRenewSeconds": {"type": "integer", "minimum": 1},
+        "gracefulShutdownSeconds": {"type": "integer", "minimum": 1},
+        "terminationGracePeriodSeconds": {"type": "integer", "minimum": 11}
+      }
+    },
+    "admission": {"type": "object", "properties": {"enabled": {"type": "boolean"}}},
+    "quota": {
+      "type": "object",
+      "properties": {"ratePerSecond": {"type": "integer", "minimum": 1}, "burst": {"type": "integer", "minimum": 1}}
+    },
+    "backpressure": {
+      "type": "object",
+      "properties": {
+        "oldestTaskAgeSeconds": {"type": "integer", "minimum": 1},
+        "releaseTaskAgeSeconds": {"type": "integer", "minimum": 1},
+        "storageHighWatermark": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "storageLowWatermark": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "storageSource": {"enum": ["prometheus", "disabled"]}
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "properties": {
+        "delaysSeconds": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}},
+        "jitterPercent": {"type": "integer", "minimum": 0, "maximum": 100}
+      }
+    },
+    "data": {
+      "type": "object",
+      "required": ["mode", "mysql", "redis", "rabbit", "mongo"],
+      "properties": {
+        "mode": {"enum": ["lab", "external"]},
+        "mysql": {"type": "object", "required": ["writerHost", "writerPort", "readerHost", "readerPort", "schema", "simulatorSchema"]},
+        "redis": {"type": "object", "required": ["host", "port"]},
+        "rabbit": {"type": "object", "required": ["host", "port", "managementPort", "vhost"]},
+        "mongo": {"type": "object", "required": ["host", "port", "database"]}
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "required": ["db", "redis", "rabbit", "mongo", "simulator", "serviceKeys", "bootstrap", "demoAccounts", "kedaMysql", "kedaRabbit"],
+      "additionalProperties": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"}
+    },
+    "gateway": {
+      "type": "object",
+      "required": ["className", "console", "apiInternal"],
+      "properties": {
+        "console": {
+          "type": "object",
+          "properties": {
+            "serviceType": {"enum": ["NodePort", "LoadBalancer", "ClusterIP"]},
+            "nodePorts": {
+              "type": "object",
+              "properties": {
+                "http": {"type": "integer", "minimum": 30000, "maximum": 32767},
+                "https": {"type": "integer", "minimum": 30000, "maximum": 32767}
+              }
+            },
+            "rateLimit": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "ratePerSecond": {"type": "integer", "minimum": 1},
+                "burst": {"type": "integer", "minimum": 0}
+              }
+            }
+          }
+        },
+        "apiInternal": {
+          "type": "object",
+          "properties": {
+            "canary": {
+              "type": "object",
+              "properties": {
+                "stableWeight": {"type": "integer", "minimum": 0, "maximum": 100},
+                "canaryWeight": {"type": "integer", "minimum": 0, "maximum": 100}
+              }
+            }
+          }
+        }
+      }
+    },
+    "securityContext": {
+      "type": "object",
+      "properties": {
+        "runAsUser": {"type": "integer", "minimum": 1},
+        "runAsGroup": {"type": "integer", "minimum": 1},
+        "readOnlyRootFilesystem": {"const": true},
+        "seccompProfile": {"enum": ["RuntimeDefault", "Localhost"]}
+      }
+    }
+  },
+  "definitions": {
+    "image": {
+      "type": "object",
+      "required": ["repository"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string", "not": {"enum": ["latest"]}},
+        "digest": {"type": "string", "pattern": "^$|^sha256:[a-f0-9]{64}$"}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {"type": "object", "required": ["cpu", "memory"]},
+        "limits": {"type": "object", "required": ["cpu", "memory"]}
+      }
+    },
+    "hpaRole": {
+      "type": "object",
+      "required": ["replicas", "resources", "autoscaling"],
+      "properties": {
+        "replicas": {"type": "integer", "minimum": 1},
+        "resources": {"$ref": "#/definitions/resources"},
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicas": {"type": "integer", "minimum": 1},
+            "maxReplicas": {"type": "integer", "minimum": 1},
+            "cpuTarget": {"type": "integer", "minimum": 10, "maximum": 95}
+          }
+        }
+      }
+    },
+    "kedaRole": {
+      "type": "object",
+      "required": ["replicas", "resources", "scaling"],
+      "properties": {
+        "replicas": {"type": "integer", "minimum": 1},
+        "resources": {"$ref": "#/definitions/resources"},
+        "scaling": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicas": {"type": "integer", "minimum": 1},
+            "maxReplicas": {"type": "integer", "minimum": 1},
+            "targetPerReplica": {"type": "integer", "minimum": 1}
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,50 @@
+# Image digests come from ops/toolchain.lock.yaml (T01 probe). Credentials are never here: Secrets are named below
+# and created before install by scripts/lab-secrets.sh (later scripts/install-local.sh).
+storageClass: ""                  # empty = cluster default (kind: standard)
+
+secrets:
+  db: paybridge-db
+  redis: paybridge-redis
+  rabbit: paybridge-rabbit
+  mongo: paybridge-mongo
+  simulator: paybridge-simulator
+
+applicationNamespace: paybridge   # namespace whose pods may reach the data services
+
+networkPolicy:
+  enabled: true
+
+mysql:
+  image: mysql@sha256:24989179f58856db763f418010c1169fecc944e3ec1ea7e921572d83eb070f70   # 8.4.11
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {cpu: "2", memory: 4Gi}
+  storage: 20Gi
+  maxConnections: 150
+  replica: {enabled: false}       # R2 asynchronous replica is added by T17
+  semiSync: {enabled: false}
+
+rabbitmq:
+  image: rabbitmq@sha256:b575d00b4e309e1eacc68e772298af74fe0f5672fac5b46ba698ffef379f68f7  # 4.x management
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  storage: 5Gi
+  vhost: paybridge
+
+mongodb:
+  image: mongo@sha256:6657bf2413fefc5be649390318f5b4cd7328e982722f8ce2ac6dfa6f0a42cb03     # 8.0
+  resources:
+    requests: {cpu: 250m, memory: 1Gi}
+    limits: {cpu: "1", memory: 2Gi}
+  storage: 10Gi
+  database: paybridge
+  replicaSet: {enabled: false}
+
+redis:
+  image: redis@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85     # 7.4.11
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+  storage: 1Gi
+  maxmemory: 400mb

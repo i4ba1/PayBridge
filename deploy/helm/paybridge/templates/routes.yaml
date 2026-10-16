@@ -1,0 +1,52 @@
+{{- /* Canary weights are changed by the pipeline with kubectl patch (not helm upgrade), so rollback is a weight reset. */ -}}
+{{- $c := .Values.gateway.console -}}
+{{- if and $c.tls.enabled $c.redirectHttpToHttps }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: console-http-redirect
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "console-public") | nindent 4 }}
+spec:
+  parentRefs: [{name: console-public, sectionName: http}]
+  hostnames: [{{ $c.hostname }}]
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect: {scheme: https, statusCode: 301}
+---
+{{- end }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: console
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "console-public") | nindent 4 }}
+spec:
+  parentRefs:
+    {{- if and $c.tls.enabled $c.redirectHttpToHttps }}
+    - {name: console-public, sectionName: https}
+    {{- else }}
+    - {name: console-public}
+    {{- end }}
+  hostnames: [{{ $c.hostname }}]
+  rules:
+    - matches: [{path: {type: PathPrefix, value: /}}]
+      backendRefs:
+        - {name: console, port: 8080}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: core-api
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "api-internal") | nindent 4 }}
+spec:
+  parentRefs: [{name: {{ .Values.gateway.apiInternal.name }}}]
+  rules:
+    - matches: [{path: {type: PathPrefix, value: /graphql}}]
+      backendRefs:
+        - {name: core-api-stable, port: 8080, weight: {{ .Values.gateway.apiInternal.canary.stableWeight }}}
+        {{- if .Values.roles.coreApi.canary.enabled }}
+        - {name: core-api-canary, port: 8080, weight: {{ .Values.gateway.apiInternal.canary.canaryWeight }}}
+        {{- end }}

@@ -1,0 +1,16 @@
+# tigera-operator values for the local kind cluster. Pod CIDR matches ops/kind/kind-config.yaml.
+installation:
+  enabled: true
+  kubernetesProvider: ""
+  calicoNetwork:
+    ipPools:
+      - cidr: 192.168.0.0/16
+        encapsulation: VXLAN
+        natOutgoing: Enabled
+        nodeSelector: all()
+apiServer:
+  enabled: false
+goldmane:
+  enabled: false
+whisker:
+  enabled: false

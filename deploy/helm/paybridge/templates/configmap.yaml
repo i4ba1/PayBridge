@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: paybridge-config
+  labels:
+    {{- include "pb.labels" (dict "root" . "component" "config") | nindent 4 }}
+data:
+  # Non-secret settings, rendered as environment variables (names are owned by the Data and Messaging Reference).
+  PAYBRIDGE_ENVIRONMENT: {{ .Values.global.environment | quote }}
+  PAYBRIDGE_RELEASE_VERSION: {{ default .Chart.AppVersion .Values.release.version | quote }}
+  PAYBRIDGE_ADMISSION_ENABLED: {{ .Values.admission.enabled | quote }}
+  PAYBRIDGE_DATASOURCE_WRITER_URL: {{ printf "jdbc:mysql://%s:%v/%s" .Values.data.mysql.writerHost .Values.data.mysql.writerPort .Values.data.mysql.schema | quote }}
+  PAYBRIDGE_DATASOURCE_READER_URL: {{ printf "jdbc:mysql://%s:%v/%s" .Values.data.mysql.readerHost .Values.data.mysql.readerPort .Values.data.mysql.schema | quote }}
+  PAYBRIDGE_SIMULATOR_DATASOURCE_URL: {{ printf "jdbc:mysql://%s:%v/%s" .Values.data.mysql.writerHost .Values.data.mysql.writerPort .Values.data.mysql.simulatorSchema | quote }}
+  PAYBRIDGE_RABBIT_HOST: {{ .Values.data.rabbit.host | quote }}
+  PAYBRIDGE_RABBIT_PORT: {{ .Values.data.rabbit.port | quote }}
+  PAYBRIDGE_RABBIT_VIRTUAL_HOST: {{ .Values.data.rabbit.vhost | quote }}
+  PAYBRIDGE_RABBIT_TLS_ENABLED: {{ .Values.data.rabbit.tls | quote }}
+  PAYBRIDGE_MONGO_DATABASE: {{ .Values.data.mongo.database | quote }}
+  PAYBRIDGE_REDIS_HOST: {{ .Values.data.redis.host | quote }}
+  PAYBRIDGE_REDIS_PORT: {{ .Values.data.redis.port | quote }}
+  PAYBRIDGE_REDIS_TLS_ENABLED: {{ .Values.data.redis.tls | quote }}
+  PAYBRIDGE_CORE_GRAPHQL_URL: {{ .Values.core.graphqlUrl | quote }}
+  PAYBRIDGE_PROVIDER_TIMEOUT_MS: {{ mul (int .Values.timing.providerTimeoutSeconds) 1000 | quote }}
+  PAYBRIDGE_EXECUTOR_LEASE_SECONDS: {{ .Values.timing.taskLeaseSeconds | quote }}
+  PAYBRIDGE_EXECUTOR_LEASE_RENEW_SECONDS: {{ .Values.timing.taskLeaseRenewSeconds | quote }}
+  PAYBRIDGE_EXECUTOR_SHUTDOWN_GRACE_SECONDS: {{ .Values.timing.gracefulShutdownSeconds | quote }}
+  PAYBRIDGE_EXECUTOR_CLAIM_BATCH: {{ .Values.roles.executor.claimBatch | quote }}
+  PAYBRIDGE_INTAKE_PREFETCH: {{ .Values.roles.intake.prefetch | quote }}
+  PAYBRIDGE_PROJECTION_PREFETCH: {{ .Values.roles.projection.prefetch | quote }}
+  PAYBRIDGE_QUOTA_DEFAULT_RATE_PER_SECOND: {{ .Values.quota.ratePerSecond | quote }}
+  PAYBRIDGE_QUOTA_DEFAULT_BURST: {{ .Values.quota.burst | quote }}
+  PAYBRIDGE_ADMISSION_CAPACITY_REJECT_TASK_AGE_SECONDS: {{ .Values.backpressure.oldestTaskAgeSeconds | quote }}
+  PAYBRIDGE_ADMISSION_CAPACITY_RELEASE_TASK_AGE_SECONDS: {{ .Values.backpressure.releaseTaskAgeSeconds | quote }}
+  PAYBRIDGE_ADMISSION_CAPACITY_REJECT_STORAGE_PERCENT: {{ mul (float64 .Values.backpressure.storageHighWatermark) 100 | int | quote }}
+  PAYBRIDGE_ADMISSION_CAPACITY_RELEASE_STORAGE_PERCENT: {{ mul (float64 .Values.backpressure.storageLowWatermark) 100 | int | quote }}
+  PAYBRIDGE_RECONCILIATION_DELAYS_SECONDS: {{ join "," .Values.reconciliation.delaysSeconds | quote }}
+  PAYBRIDGE_RECONCILIATION_JITTER_FRACTION: {{ divf (float64 .Values.reconciliation.jitterPercent) 100 | quote }}
+  PAYBRIDGE_SESSION_SECURE_COOKIE: {{ .Values.session.secureCookie | quote }}
+  PAYBRIDGE_SESSION_IDLE_TIMEOUT_MINUTES: {{ .Values.session.idleTimeoutMinutes | quote }}
+  PAYBRIDGE_SECURITY_BOOTSTRAP_TOKEN_TTL_HOURS: {{ .Values.bootstrap.tokenTtlHours | quote }}
+  MANAGEMENT_SERVER_PORT: "8081"
+  SERVER_SHUTDOWN: graceful
+  SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: {{ printf "%vs" .Values.timing.gracefulShutdownSeconds | quote }}

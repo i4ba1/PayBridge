@@ -28,11 +28,18 @@ images:   # exercised by Testcontainers in the probe
   mongodb: mongo@sha256:6657bf2413fefc5be649390318f5b4cd7328e982722f8ce2ac6dfa6f0a42cb03       # 8.0.x
   rabbitmq: rabbitmq@sha256:b575d00b4e309e1eacc68e772298af74fe0f5672fac5b46ba698ffef379f68f7   # 4.x management
   redis: redis@sha256:4fa24486b8bcca8eec45ee0eb166edc674795e53a2b53d1a9ef263eecebaac85         # 7.4.11
-platform_candidates_unproven:   # recorded only; T03 proves them in a cluster
-  nginx_gateway_fabric: "2.8.0 (candidate)"
-  kind_node_image: TBD-T03
-  calico: TBD-T03
-  gateway_api_crds: TBD-T03
-  keda: TBD-T03
-  metrics_server: TBD-T03
-  kube_prometheus_stack: TBD-T03
+platform:   # read by scripts/cluster-local.sh; T03 pins, cluster-versions.json records what was installed
+  kind: v0.33.0
+  helm: v4.3.1
+  kubectl_tested_client: v1.36.1
+  kind_node_image: "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
+  calico_chart: v3.33.0
+  calico_crds_chart: v3.33.0
+  gateway_api_crds: v1.6.3
+  gateway_api_crds_file: ops/gateway/gateway-api-v1.6.3-standard-install.yaml
+  gateway_api_crds_sha256: 356c2b8e286a964dc20995435659ad1095386329974793af10bbfe3eff977fe5
+  nginx_gateway_fabric_chart: 2.8.0
+  metrics_server_chart: 3.14.0
+  keda_chart: 2.21.0
+  kube_prometheus_stack_chart: 92.9.0
+  metrics_server_extra_args: "--kubelet-insecure-tls"   # local kind only
