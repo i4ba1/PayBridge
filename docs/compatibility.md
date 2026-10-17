@@ -99,3 +99,24 @@ DGS 10.6.0 with Spring GraphQL on Boot 3.5.16, Lettuce (Spring Data Redis 3.5.13
 - Payment, invoice and case lookups by id cannot be tested for non-disclosing isolation yet because those resolvers arrive in T07 onward. The merchant check they will use (`Authorizer`, `ActorContext.merchantId`) is tested through the authorization layer and the user and merchant lookups.
 - The Apollo Java 4.4.3 keep-or-replace decision is still open; T05 does not use the client.
 - The seed and migrate Jobs, and the Redis throttle against the cluster's Redis, have not run in the kind cluster (no application image).
+
+## T06: provider simulator and adapter (verified 2026-10-17)
+Tomcat 10.1 (Boot 3.5.16) for the simulator, `java.net.http.HttpClient` for the adapter and the webhook sender, MySQL 8.4.11 for `paybridge_sim`. 274 tests pass in the whole build (`artifacts/T06/test-summary.json`); the five scenarios are transcribed in `artifacts/T06/scenario-transcript.txt`. The simulator boot jar was also started against the lab MySQL in the kind cluster with the environment variable names the chart renders: it migrated `paybridge_sim`, reported readiness UP and accepted a charge (that test row was deleted again).
+
+### Findings that change the documents (API/DMR/POR amendments to apply)
+- **"Drop the response" needs a Tomcat hook.** A servlet cannot close a socket without writing. The simulator marks the request and a Tomcat `Valve` sends `ActionCode.CLOSE_NOW` before any byte is written, so the client sees a connection that ended with no answer. This ties the simulator to Tomcat (the Boot default); a switch to Jetty or Undertow needs another implementation.
+- **The DMR scenario tables did not carry what the API reports.** The API shows `usedCount`, `maxUses` and the state `EXHAUSTED`; DMR `sim_scenario_run` had neither column. V001 adds `max_uses` and `used_count`, adds `scenario_run_id` to `sim_key_counter` (so a key is counted once and a retry cannot use the run twice) and adds `ix_sim_charge_updated`.
+- **The request hash includes `scenarioRunId`.** API 8.2 says the run is immutable for the key; DMR's hash list omitted it. A key reused with another run is a `409 idempotency_conflict`.
+- **The operations listing follows the API, not the DMR.** API 8.3: by `updatedAt`, newest first, at most 100 per page, opaque cursor. DMR section 9 described `created_at` ascending with limit 500. Restore comparison works with either; the code implements the API.
+- **A decline is HTTP 200, a new success is 201, a new pending transfer is 202.** API 8.2 allowed "201 or 200" for a decline; DMR says 200. The adapter accepts all of them.
+- **Provider reference format is `sim_ch_` plus 20 hex characters** (DMR). The API examples show `simch_...`; examples only.
+- **`spring.config.name=simulator`.** The simulator's settings file is `simulator.yaml` so that it cannot be shadowed by another module's `application.yaml` on a shared classpath (it was, in the integration tests). The `main` method sets the name; any other launcher must too.
+- **Time zones broke the first version.** `java.sql.Timestamp.valueOf(LocalDateTime)` shifts by the JVM's zone before the driver converts again. All simulator times are now `LocalDateTime` in UTC, which is written as is. The chart's JDBC URL does not need a time zone parameter for this.
+- **Chart fixes found while checking the variable names:** the simulator webhook target is `/internal/webhooks/simulator` (the skeleton had `/webhooks/provider`), and `PAYBRIDGE_SIMULATOR_WEBHOOK_SECRET` is now rendered from `paybridge-service-keys` entry `webhook-hmac-current`. `PAYBRIDGE_SIMULATOR_DATASOURCE_POOL_MAX_SIZE` binds to `paybridge.simulator.datasource.pool.max-size`; a unit test checks every variable the chart sets for the simulator.
+- **The worked webhook example is correct:** the 286 byte body and signature `dc8fa64a…` reproduce exactly, in both the simulator and `WebhookSignatureVerifier`.
+
+### Not done in T06 (disclosed)
+- **No separate simulator administrator identity.** One bearer token guards charge, lookup, scenario and listing endpoints; the plan asked for an admin identity on the scenario endpoints. Network isolation (ClusterIP, NetworkPolicy) is the second control. Proposed: split the token when T19 creates the Secrets.
+- **The core webhook route does not exist yet** (T11). The simulator is tested against a stand-in receiver; the signature check on the receiving side is `WebhookSignatureVerifier`, tested against the documented vector.
+- **Cross-pod behavior is by design but was exercised with one simulator.** `SKIP LOCKED` workers and the 30 second visibility timeout are in the code; two simultaneous pods were not run.
+- **`ResponseLossIT` and the reconciliation case reasons** (`PROVIDER_IDEMPOTENCY_CONFLICT`, `PROVIDER_REJECTED`) belong to the executor and reconciliation tasks (T08, T12). T06 delivers the adapter classes those tasks react to.

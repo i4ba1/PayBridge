@@ -57,7 +57,10 @@
 - name: PAYBRIDGE_SIMULATOR_DATASOURCE_POOL_MAX_SIZE
   value: {{ $pools.simulator | quote }}
 - name: PAYBRIDGE_SIMULATOR_WEBHOOK_TARGET_URL
-  value: http://core-api-stable.{{ .root.Release.Namespace }}.svc.cluster.local:8080/webhooks/provider
+  value: http://core-api-stable.{{ .root.Release.Namespace }}.svc.cluster.local:8080/internal/webhooks/simulator
+# The webhook HMAC key is a distinct entry of the service keys Secret (API contract 7.5); only the simulator reads it here.
+- name: PAYBRIDGE_SIMULATOR_WEBHOOK_SECRET
+  valueFrom: {secretKeyRef: {name: {{ $s.serviceKeys }}, key: webhook-hmac-current}}
 {{- end }}
 {{- end -}}
 

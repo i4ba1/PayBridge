@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: paybridge-simulator
+  main:
+    banner-mode: off
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true      # unknown scenario parameters are rejected (DMR section 9)
+    serialization:
+      write-dates-as-timestamps: false
+  flyway:
+    table: sim_schema_history
+    locations: classpath:db/sim-migration
+    baseline-on-migrate: false
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.web: INFO

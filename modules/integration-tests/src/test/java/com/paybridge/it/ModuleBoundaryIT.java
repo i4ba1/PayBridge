@@ -69,6 +69,23 @@ class ModuleBoundaryIT {
     }
 
     @Test
+    void coreAndAdaptersNeverReachTheSimulatorInternals() {
+        // The core talks to the simulator over HTTP only; its database is closed to the core by separate credentials.
+        noClasses().that().resideInAnyPackage("com.paybridge.core..", "com.paybridge.adapter..", "com.paybridge.application..")
+                .should().dependOnClassesThat().resideInAPackage("com.paybridge.simulator..")
+                .check(classes);
+    }
+
+    @Test
+    void theProviderAdapterPerformsNoSql() {
+        assertThat(classes.containPackage("com.paybridge.adapter.provider")).isTrue();
+        noClasses().that().resideInAPackage("com.paybridge.adapter.provider..")
+                .should().dependOnClassesThat().resideInAnyPackage("java.sql..", "javax.sql..", "org.springframework.jdbc..",
+                        "org.springframework.data..", "jakarta.persistence..", "org.hibernate..")
+                .check(classes);
+    }
+
+    @Test
     void simulatorIsIndependent() {
         noClasses().that().resideInAPackage("com.paybridge.simulator..")
                 .should().dependOnClassesThat().resideInAnyPackage(

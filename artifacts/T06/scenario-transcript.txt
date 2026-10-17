@@ -1,0 +1,15 @@
+1 SUCCESS    charge: OBSERVED SUCCEEDED rev=1 http=201
+1 SUCCESS    webhook: charge.succeeded rev=1 signature=VALID
+2 DECLINE    charge: OBSERVED DECLINED rev=1 decline=CARD_DECLINED http=200
+2 DECLINE    webhook: charge.declined outcome=DECLINED
+3 DELAYED    charge: OBSERVED PENDING rev=1 http=202
+3 DELAYED    lookup right after: OBSERVED PENDING rev=1 http=200
+3 DELAYED    lookup after delay: OBSERVED SUCCEEDED rev=2 http=200
+3 DELAYED    webhook: charge.succeeded rev=2
+4 TIMEOUT    first charge (client timeout 500 ms): NO_EVIDENCE class=TRANSPORT_UNCERTAIN (no HTTP response)
+4 TIMEOUT    lookup: NOT_FOUND http=404
+4 TIMEOUT    second charge, same key: OBSERVED SUCCEEDED rev=1 http=201
+5 LOST       first charge: NO_EVIDENCE class=TRANSPORT_UNCERTAIN (no HTTP response)
+5 LOST       lookup: OBSERVED SUCCEEDED rev=1 http=200 reference=sim_ch_64b814e87ab1d0e537c2
+5 LOST       retry, same key: OBSERVED SUCCEEDED rev=1 http=200
+6 ISOLATION  12 concurrent charges over run-a (decline), run-b (success) and default (success): each run kept its own outcome
