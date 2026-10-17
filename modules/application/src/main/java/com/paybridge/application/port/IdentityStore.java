@@ -1,6 +1,7 @@
 package com.paybridge.application.port;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /** Persistence port for accounts. Implementations return detached records; entities never cross this boundary. */
@@ -11,6 +12,21 @@ public interface IdentityStore {
     Optional<UserRecord> findById(String id);
 
     boolean adminExists();
+
+    /** Applies the non null fields of the change and returns the new state. Optimistic locking guards concurrent edits. */
+    UserRecord update(String id, UserChange change);
+
+    List<UserRecord> list(UserFilter filter, int limit, String afterUsername);
+
+    record UserChange(String displayName, Boolean enabled, GlobalRole globalRole, String passwordHash,
+                      Boolean mustChangePassword) {
+        @Override
+        public String toString() {
+            return "UserChange[displayName=" + displayName + ", enabled=" + enabled + ", globalRole=" + globalRole + "]";
+        }
+    }
+
+    record UserFilter(Boolean enabled, String merchantId, String query) {}
 
     /** Creates the account. Fails with {@link DuplicateAccountException} when the username or id is already taken. */
     UserRecord create(NewUser user);

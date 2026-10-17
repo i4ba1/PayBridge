@@ -8,7 +8,9 @@ GRANT SELECT ON paybridge.flyway_schema_history TO 'pb_core'@'%';
 
 GRANT SELECT, INSERT, UPDATE ON paybridge.app_user        TO 'pb_core'@'%';
 GRANT SELECT, INSERT, UPDATE ON paybridge.merchant        TO 'pb_core'@'%';
-GRANT SELECT, INSERT, UPDATE ON paybridge.membership      TO 'pb_core'@'%';
+-- DELETE on membership only: removing a role is an administrator action recorded in audit_action; memberships
+-- are not financial rows. (DMR amended in T05.)
+GRANT SELECT, INSERT, UPDATE, DELETE ON paybridge.membership TO 'pb_core'@'%';
 GRANT SELECT, INSERT, UPDATE ON paybridge.bootstrap_state TO 'pb_core'@'%';
 GRANT SELECT, INSERT, UPDATE ON paybridge.invoice         TO 'pb_core'@'%';
 GRANT SELECT, INSERT, UPDATE ON paybridge.method_catalog  TO 'pb_core'@'%';

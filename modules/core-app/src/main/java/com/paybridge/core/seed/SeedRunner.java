@@ -20,7 +20,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /** Role seed: runs the idempotent seed once (profile base or demo) and exits with code 0 even when all rows existed. */
@@ -28,11 +27,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 public class SeedRunner {
     private static final Logger log = LoggerFactory.getLogger(SeedRunner.class);
     private static final String SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount/";
-
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-    }
 
     @Bean
     @Lazy

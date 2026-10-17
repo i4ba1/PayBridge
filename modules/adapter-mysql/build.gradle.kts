@@ -14,4 +14,5 @@ dependencies {
     api("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
 }

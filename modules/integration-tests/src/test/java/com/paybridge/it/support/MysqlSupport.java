@@ -42,11 +42,16 @@ public final class MysqlSupport {
     }
 
     private static String pinnedImage() {
+        return pinnedImage("mysql");
+    }
+
+    /** The digest pinned for a lab image in ops/toolchain.lock.yaml, for example mysql or redis. */
+    public static String pinnedImage(String name) {
         try {
             var lock = Files.readString(findLock());
-            var m = Pattern.compile("(?m)^\\s+mysql:\\s+(mysql@sha256:[0-9a-f]{64})").matcher(lock);
+            var m = Pattern.compile("(?m)^\\s+" + name + ":\\s+(" + name + "@sha256:[0-9a-f]{64})").matcher(lock);
             if (!m.find()) {
-                throw new IllegalStateException("no mysql image in ops/toolchain.lock.yaml");
+                throw new IllegalStateException("no " + name + " image in ops/toolchain.lock.yaml");
             }
             return m.group(1);
         } catch (IOException e) {

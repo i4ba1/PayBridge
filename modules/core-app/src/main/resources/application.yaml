@@ -3,6 +3,11 @@ spring:
     name: paybridge-core
   flyway:
     enabled: false          # migrations are run only by the migrate role with the DDL account
+  graphql:
+    path: /graphql
+    schema:
+      introspection:
+        enabled: false      # enabled only in the local and CI profiles (API contract 5.4)
   jpa:
     open-in-view: false
     hibernate:
@@ -27,3 +32,15 @@ paybridge:
     profile: demo
     credentials:
       sink: kubernetes
+
+dgs:
+  graphql:
+    schema-locations: classpath*:graphql/**/*.graphqls
+
+logging:
+  level:
+    # Spring GraphQL logs every document WITH its variables at DEBUG, which would print passwords and temporary
+    # credentials. These loggers stay at INFO in every profile; PasswordResetIT fails if that changes.
+    org.springframework.graphql: INFO
+    com.netflix.graphql.dgs: INFO
+    graphql: INFO

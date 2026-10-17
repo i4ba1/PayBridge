@@ -26,6 +26,20 @@ public class MembershipEntity {
 
     protected MembershipEntity() {}
 
+    public MembershipEntity(String id, String userId, String merchantId, Role role, Instant now) {
+        this.id = id;
+        this.userId = userId;
+        this.merchantId = merchantId;
+        this.role = role;
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    public void changeRole(Role role, Instant now) {
+        this.role = role;
+        this.updatedAt = now;
+    }
+
     public String getId() { return id; }
     public String getUserId() { return userId; }
     public String getMerchantId() { return merchantId; }

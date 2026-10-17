@@ -43,6 +43,28 @@ public class AppUserEntity {
         this.updatedAt = now;
     }
 
+    /** Applies the non null parts of a change; Hibernate bumps the lock counter on flush. */
+    public void apply(String displayName, Boolean enabled, Role role, String passwordHash, Boolean mustChange,
+                      Instant now) {
+        if (displayName != null) {
+            this.displayName = displayName;
+        }
+        if (enabled != null) {
+            this.enabled = enabled;
+        }
+        if (role != null) {
+            this.globalRole = role;
+        }
+        if (passwordHash != null) {
+            this.passwordHash = passwordHash;
+            this.passwordChangedAt = now;
+        }
+        if (mustChange != null) {
+            this.mustChangePassword = mustChange;
+        }
+        this.updatedAt = now;
+    }
+
     public String getId() { return id; }
     public String getUsername() { return username; }
     public String getDisplayName() { return displayName; }

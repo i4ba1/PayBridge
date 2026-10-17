@@ -1,0 +1,226 @@
+{
+ "totals": {
+  "tests": 180,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0
+ },
+ "suites": [
+  {
+   "module": "contracts",
+   "task": "test",
+   "suite": "PaymentEventEnvelopeTest",
+   "tests": 4,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "core-app",
+   "task": "test",
+   "suite": "SchemaAuthDirectiveTest",
+   "tests": 3,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "core-app",
+   "task": "test",
+   "suite": "PasswordPolicyTest",
+   "tests": 6,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "core-app",
+   "task": "test",
+   "suite": "RedisLoginThrottleKeyTest",
+   "tests": 4,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "core-app",
+   "task": "test",
+   "suite": "ServiceContextVerifierTest",
+   "tests": 16,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "core-app",
+   "task": "test",
+   "suite": "KubernetesSecretSinkTest",
+   "tests": 5,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "domain",
+   "task": "test",
+   "suite": "InvoiceEligibilityTest",
+   "tests": 2,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "domain",
+   "task": "test",
+   "suite": "MoneyScaleTest",
+   "tests": 18,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "domain",
+   "task": "test",
+   "suite": "PaymentTransitionTest",
+   "tests": 27,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "ModuleBoundaryIT",
+   "tests": 6,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "BootstrapSetupIT",
+   "tests": 8,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "CrossMerchantAccessIT",
+   "tests": 7,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "DisabledUserIT",
+   "tests": 4,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "LoginThrottleIT",
+   "tests": 7,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "PasswordResetIT",
+   "tests": 6,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "RolePermissionIT",
+   "tests": 8,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "ServiceContextHttpIT",
+   "tests": 10,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "FlywayMigrationIT",
+   "tests": 3,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "InvoiceConstraintsIT",
+   "tests": 8,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "MigrateAndSeedRoleIT",
+   "tests": 5,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "MysqlStoresIT",
+   "tests": 6,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "OneActivePaymentIndexIT",
+   "tests": 6,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "SeedIdempotencyIT",
+   "tests": 7,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "TableGrantsIT",
+   "tests": 4,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  }
+ ]
+}

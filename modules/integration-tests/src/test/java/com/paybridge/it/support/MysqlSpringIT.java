@@ -3,7 +3,13 @@ package com.paybridge.it.support;
 import com.paybridge.adapter.mysql.MysqlAdapterConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+import org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -17,7 +23,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * pb_core, so every test also exercises the least privilege grants.
  */
 @Tag("integration")
-@SpringBootTest(classes = MysqlSpringIT.TestApp.class, properties = {
+@SpringBootTest(classes = MysqlSpringIT.TestApp.class, webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
         "spring.flyway.enabled=false",
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.jpa.open-in-view=false",
@@ -26,8 +32,11 @@ import org.springframework.test.context.DynamicPropertySource;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class MysqlSpringIT {
 
+    /** Only the persistence auto configuration: the core application's web and GraphQL stack is not part of store tests. */
     @SpringBootConfiguration
-    @EnableAutoConfiguration
+    @ImportAutoConfiguration({DataSourceAutoConfiguration.class, DataSourceTransactionManagerAutoConfiguration.class,
+            HibernateJpaAutoConfiguration.class, JdbcTemplateAutoConfiguration.class, TransactionAutoConfiguration.class,
+            JpaRepositoriesAutoConfiguration.class})
     @Import(MysqlAdapterConfiguration.class)
     static class TestApp {}
 
