@@ -126,6 +126,7 @@ public class DemoSeeder {
                 for (String[] method : METHODS) {
                     tally.add("merchant_method", seed.insertMerchantMethod(m.id(), method[0]));
                 }
+                tally.add("merchant_quota_setting", seed.insertMerchantQuota(m.id(), 20, 40));
                 seed.inTransaction(() -> {
                     for (InvoiceSeed i : m.invoices()) {
                         tally.add("invoice", seed.insertInvoice(i.id(), m.id(), i.reference(), i.description(),

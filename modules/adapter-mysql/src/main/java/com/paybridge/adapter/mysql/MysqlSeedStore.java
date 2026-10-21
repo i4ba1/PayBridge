@@ -136,6 +136,16 @@ public class MysqlSeedStore implements SeedStore {
     }
 
     @Override
+    public boolean insertMerchantQuota(String merchantId, int ratePerSecond, int burstCapacity) {
+        if (!absent("SELECT 1 FROM merchant_quota_setting WHERE merchant_id = ?", merchantId)) {
+            return false;
+        }
+        return jdbc.update("INSERT INTO merchant_quota_setting (merchant_id, rate_per_second, burst_capacity, "
+                + "updated_at) VALUES (?, ?, ?, UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE merchant_id = merchant_id",
+                merchantId, ratePerSecond, burstCapacity) == 1;
+    }
+
+    @Override
     public boolean insertMembership(String id, String userId, String merchantId, String role) {
         if (!absent("SELECT 1 FROM membership WHERE id = ? OR (user_id = ? AND merchant_id = ?)", id, userId,
                 merchantId)) {

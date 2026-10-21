@@ -30,6 +30,8 @@ public interface SeedStore {
 
     boolean insertMerchantMethod(String merchantId, String methodCode);
 
+    boolean insertMerchantQuota(String merchantId, int ratePerSecond, int burstCapacity);
+
     boolean insertMembership(String id, String userId, String merchantId, String role);
 
     boolean userExists(String username, String id);

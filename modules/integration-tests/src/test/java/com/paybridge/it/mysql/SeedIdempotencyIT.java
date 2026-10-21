@@ -33,7 +33,8 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 class SeedIdempotencyIT extends MysqlSpringIT {
     private static final DemoSeeder.Options DEMO = new DemoSeeder.Options(true, null, 24);
     private static final List<String> TABLES = List.of("method_catalog", "method_token", "bootstrap_state", "merchant",
-            "merchant_method", "invoice", "app_user", "membership", "payment", "payment_request", "audit_action");
+            "merchant_method", "merchant_quota_setting", "invoice", "app_user", "membership", "payment", "payment_request",
+            "audit_action");
 
     private static HikariDataSource root;
     private static JdbcTemplate rootJdbc;
@@ -70,7 +71,7 @@ class SeedIdempotencyIT extends MysqlSpringIT {
             try (var st = con.createStatement()) {
                 st.execute("SET FOREIGN_KEY_CHECKS = 0");
                 for (String t : List.of("payment_attempt", "payment_request", "payment", "invoice", "membership",
-                        "merchant_method", "bootstrap_state", "app_user", "merchant", "method_token", "method_catalog",
+                        "merchant_method", "merchant_quota_setting", "bootstrap_state", "app_user", "merchant", "method_token", "method_catalog",
                         "audit_action")) {
                     st.execute("DELETE FROM " + t);
                 }
@@ -107,6 +108,7 @@ class SeedIdempotencyIT extends MysqlSpringIT {
         var counts = rowCounts();
         assertThat(counts).containsEntry("method_catalog", 2).containsEntry("method_token", 3)
                 .containsEntry("bootstrap_state", 1).containsEntry("merchant", 2).containsEntry("merchant_method", 4)
+                .containsEntry("merchant_quota_setting", 2)
                 .containsEntry("invoice", 10).containsEntry("app_user", 4).containsEntry("membership", 4)
                 .containsEntry("payment", 0);
         assertThat(sinkCalls).containsOnlyKeys("demo-operator-a", "demo-viewer-a", "demo-operator-b", "demo-viewer-b");
@@ -158,6 +160,16 @@ class SeedIdempotencyIT extends MysqlSpringIT {
 
     @Test
     @Order(3)
+    void demoMerchantsGetTheDefaultQuotaOnce() {
+        var rows = rootJdbc.queryForList("SELECT rate_per_second, burst_capacity FROM merchant_quota_setting");
+        assertThat(rows).hasSize(2).allSatisfy(r -> {
+            assertThat(r.get("rate_per_second")).isEqualTo(20);
+            assertThat(r.get("burst_capacity")).isEqualTo(40);
+        });
+    }
+
+    @Test
+    @Order(4)
     void firstSeedWritesTheCredentialFileWithAllFourAccounts() throws Exception {
         Path file = tmp.resolve("creds.env");
         List<String> lines = Files.readAllLines(file);
@@ -165,7 +177,7 @@ class SeedIdempotencyIT extends MysqlSpringIT {
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     void baseProfileAddsNoDemoRows() {
         clearData();
         var report = seeder(tmp.resolve("unused.env")).run(new DemoSeeder.Options(false, null, 24));
@@ -175,7 +187,7 @@ class SeedIdempotencyIT extends MysqlSpringIT {
     }
 
     @Test
-    @Order(5)
+    @Order(6)
     void bootstrapTokenIsHashedRearmedAndIgnoredOnceAnAdministratorExists() {
         var withToken = new DemoSeeder.Options(false, "token-value-for-test", 24);
         var report = seeder(tmp.resolve("unused.env")).run(withToken);
@@ -192,7 +204,7 @@ class SeedIdempotencyIT extends MysqlSpringIT {
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     void aSecondSeedHoldingTheLockIsSkippedWithoutError() throws Exception {
         var holder = (HikariDataSource) MysqlSupport.rootDataSource();
         try (var con = holder.getConnection(); var st = con.createStatement()) {
@@ -208,7 +220,7 @@ class SeedIdempotencyIT extends MysqlSpringIT {
     }
 
     @Test
-    @Order(7)
+    @Order(8)
     void aFailingCredentialSinkCreatesNoAccounts() {
         clearData();
         var failing = new DemoSeeder(seedStore, identityStore, PasswordEncoderFactories.createDelegatingPasswordEncoder(),
@@ -230,6 +242,7 @@ class SeedIdempotencyIT extends MysqlSpringIT {
         @Override public boolean insertMerchant(String a, String b, String c, String d) { return delegate.insertMerchant(a, b, c, d); }
         @Override public boolean insertInvoice(String a, String b, String c, String d, long e, String f) { return delegate.insertInvoice(a, b, c, d, e, f); }
         @Override public boolean insertMerchantMethod(String a, String b) { return delegate.insertMerchantMethod(a, b); }
+        @Override public boolean insertMerchantQuota(String a, int b, int c) { return delegate.insertMerchantQuota(a, b, c); }
         @Override public boolean insertMembership(String a, String b, String c, String d) { return delegate.insertMembership(a, b, c, d); }
         @Override public boolean userExists(String a, String b) { return delegate.userExists(a, b); }
     }
