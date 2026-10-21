@@ -1,5 +1,6 @@
 package com.paybridge.core.graphql;
 
+import graphql.analysis.FieldComplexityEnvironment;
 import graphql.analysis.MaxQueryComplexityInstrumentation;
 import graphql.analysis.MaxQueryDepthInstrumentation;
 import graphql.schema.GraphQLTypeUtil;
@@ -25,12 +26,29 @@ public final class GraphQlLimits {
             int cost = 1;
             var type = GraphQLTypeUtil.unwrapNonNull(env.getFieldDefinition().getType());
             if (GraphQLTypeUtil.isList(type)) {
-                Object limit = env.getArguments().get("limit");
+                Object limit = pageLimit(env);
                 int size = limit instanceof Number n && n.intValue() > 0 ? n.intValue() : DEFAULT_PAGE;
                 cost += LIST_COST * ((size + DEFAULT_PAGE - 1) / DEFAULT_PAGE);
             }
             return cost + childComplexity;
         });
+    }
+
+    /**
+     * The {@code limit} that pages this list field: its own argument, else the nearest ancestor's (every paged field in
+     * the schema takes {@code limit} on a non list field whose child {@code items} is the list). The search stops at an
+     * ancestor that is itself a list, so a list nested in a paged list is not priced with the outer page size.
+     */
+    private static Object pageLimit(FieldComplexityEnvironment env) {
+        for (FieldComplexityEnvironment e = env; e != null; e = e.getParentEnvironment()) {
+            if (e.getArguments().containsKey("limit")) {
+                return e.getArguments().get("limit");
+            }
+            if (e != env && GraphQLTypeUtil.isList(GraphQLTypeUtil.unwrapNonNull(e.getFieldDefinition().getType()))) {
+                return null;
+            }
+        }
+        return null;
     }
 
     @Configuration(proxyBeanMethods = false)

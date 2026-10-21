@@ -25,9 +25,11 @@ class ConcurrentEligibilityIT extends AdmissionIT {
                 st.setString(1, invoice);
                 st.executeQuery().close();
             }
+            // The pointer is still NULL, so the reject-only pre-check falls through and the transaction blocks on FOR UPDATE.
             CompletableFuture<PaymentAdmission> waiting = CompletableFuture.supplyAsync(() -> request(key()));
-            Thread.sleep(500);
-            assertThat(waiting).as("the admission is blocked on the invoice lock").isNotDone();
+            assertThat(awaitLockWaitOnTheInvoice()).as("the admission is blocked on the invoice lock (data_lock_waits)")
+                    .isTrue();
+            assertThat(waiting).isNotDone();
 
             try (var st = holder.prepareStatement("UPDATE invoice SET active_payment_id = ?, version = version + 1 WHERE id = ?")) {
                 st.setString(1, other);
@@ -41,5 +43,23 @@ class ConcurrentEligibilityIT extends AdmissionIT {
         }
         assertThat(count("payment_request")).as("the reservation was rolled back").isZero();
         assertThat(rowsWritten()).as("only the planted FAILED payment").isOne();
+    }
+
+    /**
+     * Polls InnoDB (deadline 10 s) until a lock request on the invoice table is waiting. performance_schema.data_lock_waits
+     * is used because information_schema.innodb_trx did not list the waiting pb_core transaction on MySQL 8.4.11.
+     */
+    private boolean awaitLockWaitOnTheInvoice() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Long waiting = rootJdbc.queryForObject("SELECT COUNT(*) FROM performance_schema.data_lock_waits w "
+                    + "JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID "
+                    + "WHERE l.OBJECT_SCHEMA = DATABASE() AND l.OBJECT_NAME = 'invoice'", Long.class);
+            if (waiting != null && waiting > 0) {
+                return true;
+            }
+            Thread.sleep(20);
+        }
+        return false;
     }
 }

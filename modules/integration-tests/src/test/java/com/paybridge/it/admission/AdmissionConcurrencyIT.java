@@ -37,13 +37,23 @@ class AdmissionConcurrencyIT extends AdmissionIT {
                 results.add(f.get());
             }
 
-            var created = results.stream().filter(r -> r instanceof Accepted a && !a.replayed()).map(r -> (Accepted) r).toList();
+            var created = new ArrayList<Integer>();
+            for (int i = 0; i < threads; i++) {
+                if (results.get(i) instanceof Accepted a && !a.replayed()) {
+                    created.add(i);
+                }
+            }
             assertThat(created).as("exactly one request created the payment").hasSize(1);
-            String paymentId = created.get(0).paymentId();
-            for (var r : results) {
-                if (r instanceof Accepted a) {
-                    assertThat(a.paymentId()).isEqualTo(paymentId);
+            String paymentId = ((Accepted) results.get(created.get(0))).paymentId();
+            String winningKey = keys.get(created.get(0) % keys.size());
+            for (int i = 0; i < threads; i++) {
+                var r = results.get(i);
+                if (keys.get(i % keys.size()).equals(winningKey)) {
+                    // FR-011: every request with the winner's key and payload gets the winner's payment (created or replayed)
+                    assertThat(r).as("request %d on the winning key: %s", i, r).isInstanceOf(Accepted.class);
+                    assertThat(((Accepted) r).paymentId()).isEqualTo(paymentId);
                 } else {
+                    assertThat(r).as("request %d on a losing key", i).isInstanceOf(Rejected.class);
                     assertThat(((Rejected) r).code()).isEqualTo(Code.INVOICE_NOT_ELIGIBLE);
                 }
             }

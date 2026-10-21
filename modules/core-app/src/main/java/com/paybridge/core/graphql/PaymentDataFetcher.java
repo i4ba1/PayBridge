@@ -17,7 +17,6 @@ import com.paybridge.core.graphql.model.PaymentTypes.RequestPaymentInput;
 import com.paybridge.core.identity.ActorContext;
 import graphql.schema.DataFetchingEnvironment;
 import java.util.List;
-import java.util.Map;
 
 /**
  * requestPayment and payment(id). Authorization (OPERATOR / VIEWER in the signed merchant) has already happened in
@@ -25,15 +24,6 @@ import java.util.Map;
  */
 @DgsComponent
 public class PaymentDataFetcher {
-    private static final Map<PaymentAdmission.Code, String> MESSAGES = Map.of(
-            PaymentAdmission.Code.VALIDATION_ERROR, "The request is not valid.",
-            PaymentAdmission.Code.NOT_FOUND, "Invoice not found.",
-            PaymentAdmission.Code.IDEMPOTENCY_CONFLICT, "This idempotency key was already used for a different request.",
-            PaymentAdmission.Code.INVOICE_NOT_ELIGIBLE, "The invoice already has an active payment.",
-            PaymentAdmission.Code.RATE_LIMITED, "Too many requests. Try again later.",
-            PaymentAdmission.Code.TEMPORARILY_UNAVAILABLE,
-            "Payments are temporarily unavailable. Retry with the same idempotency key.");
-
     private final AdmitPayment admitPayment;
     private final PaymentStore payments;
 
@@ -55,7 +45,7 @@ public class PaymentDataFetcher {
         PaymentAdmission.Rejected rejected = (PaymentAdmission.Rejected) result;
         List<FieldProblem> fields = rejected.fieldProblems() == null ? null
                 : rejected.fieldProblems().stream().map(f -> new FieldProblem(f.field(), f.code(), f.message())).toList();
-        return new OperationProblem(rejected.code().name(), MESSAGES.get(rejected.code()), rejected.retryAfterSeconds(),
+        return new OperationProblem(rejected.code().name(), message(rejected.code()), rejected.retryAfterSeconds(),
                 fields, null);
     }
 
@@ -64,6 +54,18 @@ public class PaymentDataFetcher {
         String merchantId = IdentityDataFetcher.granted(env).actor().merchantId();
         return payments.findById(id).filter(p -> p.merchantId().equals(merchantId)).map(PaymentDataFetcher::toPayment)
                 .orElse(null);
+    }
+
+    /** Exhaustive over the codes with no default branch, so a new code is a compile error until it has a message. */
+    static String message(PaymentAdmission.Code code) {
+        return switch (code) {
+            case VALIDATION_ERROR -> "The request is not valid.";
+            case NOT_FOUND -> "Invoice not found.";
+            case IDEMPOTENCY_CONFLICT -> "This idempotency key was already used for a different request.";
+            case INVOICE_NOT_ELIGIBLE -> "The invoice already has an active payment.";
+            case RATE_LIMITED -> "Too many requests. Try again later.";
+            case TEMPORARILY_UNAVAILABLE -> "Payments are temporarily unavailable. Retry with the same idempotency key.";
+        };
     }
 
     private static Payment toPayment(PaymentRecord p) {

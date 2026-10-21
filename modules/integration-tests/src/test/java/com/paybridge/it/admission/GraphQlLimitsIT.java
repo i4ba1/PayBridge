@@ -51,4 +51,23 @@ class GraphQlLimitsIT extends CoreHttpIT {
         var response = call(viewer, merchant, "Many", document, Map.of());
         assertThat(response.body().path("errors").toString()).doesNotContain("complexity");
     }
+
+    private static String pagedAliases(int count) {
+        return IntStream.range(0, count).mapToObj(i -> "p" + i + ": payments(limit: 100) { ... on PaymentList { items { id } } } ")
+                .collect(Collectors.joining());
+    }
+
+    @Test
+    void theLimitOfARealPagedFieldIsPricedOnItsItemsList() {
+        // payments(limit:100){... on PaymentList {items {id}}} = 1 (payments, a union, not a list)
+        //   + 1 + 5*ceil(100/25)=20 (items, priced with the parent's limit) + 1 (id) = 23.
+        // Fourteen aliases = 322 > 300 is refused; thirteen = 299 is not.
+        var over = call(viewer, merchant, "Paged", "query Paged { " + pagedAliases(14) + "}", Map.of());
+        assertThat(over.status()).isEqualTo(200);
+        assertThat(over.body().path("errors").toString()).contains("complexity");
+        assertThat(over.data().isMissingNode() || over.data().isNull()).isTrue();
+
+        var under = call(viewer, merchant, "Paged", "query Paged { " + pagedAliases(13) + "}", Map.of());
+        assertThat(under.body().path("errors").toString()).doesNotContain("complexity");
+    }
 }

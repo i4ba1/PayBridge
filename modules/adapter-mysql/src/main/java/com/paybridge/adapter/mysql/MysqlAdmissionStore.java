@@ -30,8 +30,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * the order, the MySQL error numbers (1062, 1205, 1213) and the session lock wait timeout have to be visible.
  *
  * <p>Before the transaction, {@link #admit} runs a reject-only pre-check without locks: an existing reservation for the
- * key is answered as a duplicate, and an invoice whose pointer is already set is answered as not eligible, without
- * inserting a reservation. Without it, every request queued on a losing key's {@code ux_payment_request} entry
+ * key is answered as a duplicate, and an invoice whose pointer is already set is answered as not eligible (after a second
+ * replay read, because a same-key winner may have committed between the two reads), without inserting a reservation. Without it, every request queued on a losing key's {@code ux_payment_request} entry
  * deadlocks (1213) when that key's holder rolls back, and retries re-form the same herd. The pre-check can only reject,
  * never admit: the {@code FOR UPDATE} read inside the transaction remains the authoritative eligibility decision.
  *
@@ -111,6 +111,12 @@ public class MysqlAdmissionStore implements AdmissionStore {
         List<Boolean> pointed = jdbc.query("SELECT active_payment_id IS NOT NULL FROM invoice WHERE id = ? AND merchant_id = ?",
                 (rs, i) -> rs.getBoolean(1), r.invoiceId(), r.merchantId());
         if (!pointed.isEmpty() && pointed.get(0)) {
+            // A same-key winner may have committed between the two reads. Its reservation and the pointer commit together,
+            // so a visible pointer guarantees this second read sees that reservation (FR-011: replay, not NotEligible).
+            Optional<Replay> committedMeanwhile = findReplay(r.merchantId(), r.idempotencyKey());
+            if (committedMeanwhile.isPresent()) {
+                return Optional.of(new AdmissionResult.Duplicate(committedMeanwhile.get()));
+            }
             return Optional.of(new AdmissionResult.NotEligible());
         }
         return Optional.empty();

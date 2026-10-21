@@ -117,7 +117,20 @@ public class AuthorizationInstrumentation extends SimplePerformantInstrumentatio
         if (!(type instanceof GraphQLNonNull)) {
             return null;                    // not visible: indistinguishable from missing
         }
-        throw new IllegalStateException(code.name());
+        throw new AccessDenied(code.name());
+    }
+
+    /** A denial on a non null, non union root field; {@link SanitizingExceptionHandler} returns its code as the message. */
+    static final class AccessDenied extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+
+        AccessDenied(String code) {
+            super(code);
+        }
+
+        String code() {
+            return getMessage();
+        }
     }
 
     private static String message(Code code) {

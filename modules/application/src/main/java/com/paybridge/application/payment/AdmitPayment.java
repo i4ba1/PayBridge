@@ -77,18 +77,15 @@ public final class AdmitPayment {
                 runs.runFor(actor.merchantId()), actor.correlationId(), settings.lockWaitTimeoutSeconds());
 
         for (int attempt = 1; attempt <= settings.maxAttempts(); attempt++) {
-            AdmissionResult result = store.admit(request);
-            if (result instanceof AdmissionResult.Created) {
-                return new Accepted(paymentId, "REQUESTED", 1, false);
-            }
-            if (result instanceof AdmissionResult.Duplicate duplicate) {
-                return answerFor(duplicate.existing(), hash);
-            }
-            if (result instanceof AdmissionResult.InvoiceNotFound) {
-                return Rejected.of(Code.NOT_FOUND);
-            }
-            if (result instanceof AdmissionResult.NotEligible) {
-                return Rejected.of(Code.INVOICE_NOT_ELIGIBLE);
+            PaymentAdmission answer = switch (store.admit(request)) {
+                case AdmissionResult.Created _ -> new Accepted(paymentId, "REQUESTED", 1, false);
+                case AdmissionResult.Duplicate duplicate -> answerFor(duplicate.existing(), hash);
+                case AdmissionResult.InvoiceNotFound _ -> Rejected.of(Code.NOT_FOUND);
+                case AdmissionResult.NotEligible _ -> Rejected.of(Code.INVOICE_NOT_ELIGIBLE);
+                case AdmissionResult.Transient _ -> null;   // retry below, then TEMPORARILY_UNAVAILABLE
+            };
+            if (answer != null) {
+                return answer;
             }
             if (attempt < settings.maxAttempts()) {
                 sleeper.accept(ThreadLocalRandom.current().nextLong(1, settings.jitterMaxMillis() + 1));
