@@ -20,3 +20,13 @@ GRANT SELECT, INSERT, UPDATE ON paybridge.payment         TO 'pb_core'@'%';
 GRANT SELECT, INSERT         ON paybridge.payment_request TO 'pb_core'@'%';
 GRANT SELECT, INSERT, UPDATE ON paybridge.payment_attempt TO 'pb_core'@'%';
 GRANT SELECT, INSERT         ON paybridge.audit_action    TO 'pb_core'@'%';
+-- V003 and V004. payment_event and reconciliation_note are immutable (no UPDATE). DELETE on outbox purges published rows.
+GRANT SELECT, INSERT         ON paybridge.payment_event          TO 'pb_core'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON paybridge.outbox         TO 'pb_core'@'%';
+GRANT SELECT, INSERT, UPDATE ON paybridge.processing_task        TO 'pb_core'@'%';
+GRANT SELECT, INSERT, UPDATE ON paybridge.webhook_inbox          TO 'pb_core'@'%';
+GRANT SELECT, INSERT, UPDATE ON paybridge.reconciliation_case    TO 'pb_core'@'%';
+GRANT SELECT, INSERT         ON paybridge.reconciliation_note    TO 'pb_core'@'%';
+GRANT SELECT, INSERT, UPDATE ON paybridge.merchant_quota_setting TO 'pb_core'@'%';
+GRANT SELECT, INSERT, UPDATE ON paybridge.dead_letter_record     TO 'pb_core'@'%';
+GRANT SELECT, INSERT, UPDATE ON paybridge.system_flag            TO 'pb_core'@'%';

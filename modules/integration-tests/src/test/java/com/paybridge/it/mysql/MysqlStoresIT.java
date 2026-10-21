@@ -115,7 +115,7 @@ class MysqlStoresIT extends MysqlSpringIT {
         var indicator = new SchemaVersionHealthIndicator(dataSource);
         var up = indicator.health();
         assertThat(up.getStatus()).isEqualTo(Status.UP);
-        assertThat(up.getDetails()).containsEntry("applied", "002").containsEntry("expected", "002");
+        assertThat(up.getDetails()).containsEntry("applied", "004").containsEntry("expected", "004");
 
         // A database that was never migrated is behind every build.
         rootJdbc.execute("CREATE DATABASE IF NOT EXISTS paybridge_empty");
@@ -127,7 +127,7 @@ class MysqlStoresIT extends MysqlSpringIT {
         try (var empty = new HikariDataSource(config)) {
             var down = new SchemaVersionHealthIndicator(empty).health();
             assertThat(down.getStatus()).isEqualTo(Status.DOWN);
-            assertThat(down.getDetails()).containsEntry("applied", "none").containsEntry("pending", 2);
+            assertThat(down.getDetails()).containsEntry("applied", "none").containsEntry("pending", 4);
         } finally {
             rootJdbc.execute("DROP DATABASE IF EXISTS paybridge_empty");
         }

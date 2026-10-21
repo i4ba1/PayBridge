@@ -25,20 +25,23 @@ class FlywayMigrationIT {
     void migratesFromEmptyAndRecordsEveryScript() throws SQLException {
         try (var ds = (HikariDataSource) MysqlSupport.dataSource(MysqlSupport.MIGRATE_USER)) {
             assertThat(SchemaVersion.check(ds).current()).isFalse();
-            assertThat(SchemaVersion.migrate(ds)).isEqualTo(2);
+            assertThat(SchemaVersion.migrate(ds)).isEqualTo(4);
 
             var jdbc = new JdbcTemplate(ds);
             List<String> history = jdbc.queryForList(
                     "SELECT CONCAT(version, ' ', script, ' success=', success) FROM flyway_schema_history "
                             + "WHERE version IS NOT NULL ORDER BY installed_rank", String.class);
             assertThat(history).containsExactly("001 V001__identity_and_invoices.sql success=1",
-                    "002 V002__payments.sql success=1");
+                    "002 V002__payments.sql success=1", "003 V003__durable_work.sql success=1",
+                    "004 V004__support_quota_and_flags.sql success=1");
 
             List<String> tables = jdbc.queryForList("SELECT table_name FROM information_schema.tables "
                     + "WHERE table_schema = 'paybridge' AND table_name <> 'flyway_schema_history' ORDER BY 1", String.class);
             assertThat(tables).containsExactlyInAnyOrder("app_user", "merchant", "membership", "bootstrap_state",
                     "invoice", "audit_action", "method_catalog", "method_token", "merchant_method", "payment",
-                    "payment_request", "payment_attempt");
+                    "payment_request", "payment_attempt", "payment_event", "outbox", "processing_task",
+                    "webhook_inbox", "reconciliation_case", "reconciliation_note", "merchant_quota_setting",
+                    "dead_letter_record", "system_flag");
         }
     }
 
@@ -51,10 +54,20 @@ class FlywayMigrationIT {
 
             assertThat(SchemaVersion.migrate(ds)).isZero();
             assertThat(checksums(jdbc)).isEqualTo(before);
-            assertThat(before).hasSize(2).doesNotContainNull();
+            assertThat(before).hasSize(4).doesNotContainNull();
             var status = SchemaVersion.check(ds);
             assertThat(status.current()).isTrue();
-            assertThat(status.applied()).isEqualTo("002");
+            assertThat(status.applied()).isEqualTo("004");
+        }
+    }
+
+    @Test
+    void theAdmissionFlagsAreSeededOpenAndOff() {
+        try (var ds = (HikariDataSource) MysqlSupport.dataSource(MysqlSupport.MIGRATE_USER)) {
+            SchemaVersion.migrate(ds);
+            var flags = new JdbcTemplate(ds).queryForList("SELECT CONCAT(flag_key, '=', flag_value) FROM system_flag ORDER BY 1",
+                    String.class);
+            assertThat(flags).containsExactly("admission.capacity=OPEN", "admission.maintenance=OFF");
         }
     }
 

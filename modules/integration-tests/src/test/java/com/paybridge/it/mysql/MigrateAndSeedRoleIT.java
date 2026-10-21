@@ -51,7 +51,7 @@ class MigrateAndSeedRoleIT {
         try (var ds = (HikariDataSource) MysqlSupport.rootDataSource()) {
             var jdbc = new JdbcTemplate(ds);
             assertThat(jdbc.queryForObject("SELECT MAX(version) FROM flyway_schema_history", String.class))
-                    .isEqualTo("002");
+                    .isEqualTo("004");
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mysql.tables_priv WHERE db = 'paybridge' AND "
                     + "user = 'pb_core'", Integer.class)).isGreaterThan(10);
         }
