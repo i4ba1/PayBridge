@@ -24,7 +24,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState,schemaVersion
+          include: readinessState,schemaVersion,invoicePointers
 
 paybridge:
   roles: api
