@@ -18,6 +18,7 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -27,6 +28,15 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The DMR 6.1 admission transaction in plain SQL. The statement order IS the lock order (reservation, invoice,
  * payment, invoice pointer, event, outbox, audit), so it must not be reordered. JPA is deliberately not used here:
  * the order, the MySQL error numbers (1062, 1205, 1213) and the session lock wait timeout have to be visible.
+ *
+ * <p>Before the transaction, {@link #admit} runs a reject-only pre-check without locks: an existing reservation for the
+ * key is answered as a duplicate, and an invoice whose pointer is already set is answered as not eligible, without
+ * inserting a reservation. Without it, every request queued on a losing key's {@code ux_payment_request} entry
+ * deadlocks (1213) when that key's holder rolls back, and retries re-form the same herd. The pre-check can only reject,
+ * never admit: the {@code FOR UPDATE} read inside the transaction remains the authoritative eligibility decision.
+ *
+ * <p>The transaction always runs as {@code REQUIRES_NEW}, so a 1062 or 1213 can never mark a caller's transaction
+ * rollback-only and the duplicate re-read always runs outside the failed transaction.
  */
 @Repository
 public class MysqlAdmissionStore implements AdmissionStore {
@@ -40,6 +50,7 @@ public class MysqlAdmissionStore implements AdmissionStore {
     MysqlAdmissionStore(JdbcTemplate jdbc, PlatformTransactionManager transactionManager, AuditStore audit) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(transactionManager);
+        this.tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.audit = audit;
     }
 
@@ -64,6 +75,10 @@ public class MysqlAdmissionStore implements AdmissionStore {
 
     @Override
     public AdmissionResult admit(AdmissionRequest request) {
+        Optional<AdmissionResult> rejected = rejectEarly(request);
+        if (rejected.isPresent()) {
+            return rejected.get();
+        }
         try {
             return tx.execute(status -> run(request, status));
         } catch (DuplicateKeyException e) {
@@ -82,6 +97,23 @@ public class MysqlAdmissionStore implements AdmissionStore {
             // 1205 lock wait timeout or 1213 deadlock: the transaction was rolled back, nothing was written.
             return new AdmissionResult.Transient();
         }
+    }
+
+    /**
+     * Reject-only pre-check with plain consistent reads (no locks, no writes). An empty result means "run the
+     * transaction", never "admitted".
+     */
+    private Optional<AdmissionResult> rejectEarly(AdmissionRequest r) {
+        Optional<Replay> replay = findReplay(r.merchantId(), r.idempotencyKey());
+        if (replay.isPresent()) {
+            return Optional.of(new AdmissionResult.Duplicate(replay.get()));
+        }
+        List<Boolean> pointed = jdbc.query("SELECT active_payment_id IS NOT NULL FROM invoice WHERE id = ? AND merchant_id = ?",
+                (rs, i) -> rs.getBoolean(1), r.invoiceId(), r.merchantId());
+        if (!pointed.isEmpty() && pointed.get(0)) {
+            return Optional.of(new AdmissionResult.NotEligible());
+        }
+        return Optional.empty();
     }
 
     private AdmissionResult run(AdmissionRequest r, TransactionStatus status) {

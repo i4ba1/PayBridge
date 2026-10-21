@@ -6,7 +6,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** Reads admission.capacity and admission.maintenance, cached for paybridge.admission.flag-cache-ms (default 1000). */
+/**
+ * Reads admission.capacity and admission.maintenance, cached for paybridge.admission.flag-cache-ms (default 1000).
+ * A missing flag row, or any value other than ON / CLOSED, is read as OFF / OPEN: the flags fail open.
+ */
 @Repository
 public class MysqlSystemFlags implements SystemFlags {
     private record Snapshot(boolean maintenanceOn, boolean capacityClosed, long loadedAtMillis) {}
