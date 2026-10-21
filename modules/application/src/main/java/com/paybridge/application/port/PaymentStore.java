@@ -16,5 +16,5 @@ public interface PaymentStore {
     record PaymentRecord(String id, String merchantId, String invoiceId, String methodCode, long amountMinor,
                          String currency, String status, long aggregateVersion, String providerKey,
                          String providerReference, String scenarioRunId, String correlationId, String requestedBy,
-                         Instant createdAt, Instant completedAt) {}
+                         Instant createdAt, Instant updatedAt, Instant completedAt) {}
 }

@@ -88,7 +88,9 @@ public abstract class CoreHttpIT {
     @BeforeEach
     void cleanState() {
         rootJdbc.execute("SET FOREIGN_KEY_CHECKS = 0");
-        for (String t : List.of("audit_action", "membership", "app_user", "merchant", "invoice")) {
+        for (String t : List.of("audit_action", "outbox", "payment_event", "payment_attempt", "payment_request", "payment",
+                "merchant_method", "method_token", "method_catalog", "merchant_quota_setting", "membership", "app_user",
+                "merchant", "invoice")) {
             rootJdbc.update("DELETE FROM " + t);
         }
         rootJdbc.execute("SET FOREIGN_KEY_CHECKS = 1");

@@ -137,7 +137,7 @@ public class IdentityDataFetcher {
 
     // ---- helpers -----------------------------------------------------------------------------------------------
 
-    private static Granted granted(DataFetchingEnvironment env) {
+    static Granted granted(DataFetchingEnvironment env) {
         Object local = env.getLocalContext();
         if (local instanceof Granted g) {
             return g;

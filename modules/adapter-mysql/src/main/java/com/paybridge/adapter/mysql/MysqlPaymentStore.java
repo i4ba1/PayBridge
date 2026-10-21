@@ -49,6 +49,6 @@ public class MysqlPaymentStore implements PaymentStore {
         return new PaymentRecord(e.getId(), e.getMerchantId(), e.getInvoiceId(), e.getMethodCode(), e.getAmountMinor(),
                 e.getCurrency(), e.getStatus().name(), e.getAggregateVersion(), e.getProviderKey(),
                 e.getProviderReference(), e.getScenarioRunId(), e.getCorrelationId(), e.getRequestedBy(),
-                e.getCreatedAt(), e.getCompletedAt());
+                e.getCreatedAt(), e.getUpdatedAt(), e.getCompletedAt());
     }
 }

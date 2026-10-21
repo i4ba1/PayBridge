@@ -60,5 +60,6 @@ public class PaymentEntity {
     public String getCorrelationId() { return correlationId; }
     public String getRequestedBy() { return requestedBy; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
     public Instant getCompletedAt() { return completedAt; }
 }
