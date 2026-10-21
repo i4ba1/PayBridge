@@ -80,7 +80,8 @@ rows for the demo merchants (rate 20, burst 40) are added to the seed, which T04
 - Result mapping: `PaymentAccepted { payment, replayed }` or `OperationProblem { code, message, retryAfterSeconds }`.
   `Payment` uses decimal strings for `amountMinor` and `version` (the business `aggregate_version`, never the lock counter).
   `attempts` is `[]` and `uncertainty` is `null` until T08 and T12.
-- `payment(id)` loads the payment with the merchant of the actor in the query; a foreign or missing id returns `null`.
+- `payment(id)` loads the payment by id and then keeps it only if its merchant is the actor's merchant; a foreign or missing id
+  returns `null` (the same answer for both).
 - `graphql/GraphQlLimits`: depth 8, complexity 300 (1 per selected field, plus 5 per list field times `ceil(limit/25)`), document 8 KiB. Depth and complexity are graphql-java instrumentations (HTTP 200 with an `errors` entry); document size is HTTP 413 from a
   `WebGraphQlInterceptor` with highest precedence, before parsing.
 - `admission/InvoicePointersHealthIndicator`: runs the `ConsistencyCheck` port (DMR recovery queries A to C) once at startup of the `api` role and exposes a health

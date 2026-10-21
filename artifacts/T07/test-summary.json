@@ -1,6 +1,6 @@
 {
  "totals": {
-  "tests": 345,
+  "tests": 355,
   "failures": 0,
   "errors": 0,
   "skipped": 0
@@ -72,8 +72,17 @@
   {
    "module": "core-app",
    "task": "test",
+   "suite": "InvoicePointersHealthIndicatorTest",
+   "tests": 2,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "core-app",
+   "task": "test",
    "suite": "GraphQlLimitsTest",
-   "tests": 4,
+   "tests": 8,
    "failures": 0,
    "errors": 0,
    "skipped": 0
@@ -226,7 +235,7 @@
    "module": "integration-tests",
    "task": "integrationTest",
    "suite": "GraphQlLimitsIT",
-   "tests": 3,
+   "tests": 4,
    "failures": 0,
    "errors": 0,
    "skipped": 0
@@ -279,6 +288,15 @@
   {
    "module": "integration-tests",
    "task": "integrationTest",
+   "suite": "PreCheckReplayRaceIT",
+   "tests": 1,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
    "suite": "ReadinessHttpIT",
    "tests": 1,
    "failures": 0,
@@ -290,6 +308,15 @@
    "task": "integrationTest",
    "suite": "RequestPaymentHttpIT",
    "tests": 7,
+   "failures": 0,
+   "errors": 0,
+   "skipped": 0
+  },
+  {
+   "module": "integration-tests",
+   "task": "integrationTest",
+   "suite": "SanitizedErrorIT",
+   "tests": 2,
    "failures": 0,
    "errors": 0,
    "skipped": 0
