@@ -1,0 +1,102 @@
+# GENERATED FROM A TEST RUN, not from a live core against the lab: a temporary subclass of CoreHttpIT (real core application over HTTP, Testcontainers MySQL 8.4 and Redis) posted these five requestPayment calls and logged them; the class was not committed. Bearer tokens are redacted; ids are test data.
+# Document: the RequestPayment mutation of RequestPaymentHttpIT (requestPayment(input) selecting PaymentAccepted { replayed payment { ... } } and OperationProblem { code message retryAfterSeconds fieldProblems }).
+
+## 1. first request
+> POST /graphql   Authorization: Bearer <redacted>   operationName=RequestPayment
+> variables: {"input":{"methodToken":"tok_sim_card_default","invoiceId":"70c0f575-1e18-4254-bdf6-ec8d3218e369","idempotencyKey":"89b26b49-4662-419f-9045-c95e556f91c2"}}
+< HTTP 200
+< {
+  "data" : {
+    "requestPayment" : {
+      "__typename" : "PaymentAccepted",
+      "replayed" : false,
+      "payment" : {
+        "id" : "4736e233-f788-482b-944c-e990f56b4c28",
+        "merchantId" : "f8b5888d-b68f-4838-9cc4-57894a97d19b",
+        "invoiceId" : "70c0f575-1e18-4254-bdf6-ec8d3218e369",
+        "status" : "REQUESTED",
+        "amountMinor" : "150000",
+        "currency" : "IDR",
+        "methodCode" : "SIMULATED_CARD",
+        "version" : "1",
+        "providerReference" : null,
+        "attempts" : [ ],
+        "uncertainty" : null
+      }
+    }
+  }
+}
+
+## 2. identical replay (same key, same payload)
+> POST /graphql   Authorization: Bearer <redacted>   operationName=RequestPayment
+> variables: {"input":{"methodToken":"tok_sim_card_default","invoiceId":"70c0f575-1e18-4254-bdf6-ec8d3218e369","idempotencyKey":"89b26b49-4662-419f-9045-c95e556f91c2"}}
+< HTTP 200
+< {
+  "data" : {
+    "requestPayment" : {
+      "__typename" : "PaymentAccepted",
+      "replayed" : true,
+      "payment" : {
+        "id" : "4736e233-f788-482b-944c-e990f56b4c28",
+        "merchantId" : "f8b5888d-b68f-4838-9cc4-57894a97d19b",
+        "invoiceId" : "70c0f575-1e18-4254-bdf6-ec8d3218e369",
+        "status" : "REQUESTED",
+        "amountMinor" : "150000",
+        "currency" : "IDR",
+        "methodCode" : "SIMULATED_CARD",
+        "version" : "1",
+        "providerReference" : null,
+        "attempts" : [ ],
+        "uncertainty" : null
+      }
+    }
+  }
+}
+
+## 3. changed payload under the same key
+> POST /graphql   Authorization: Bearer <redacted>   operationName=RequestPayment
+> variables: {"input":{"methodToken":"tok_sim_transfer_default","invoiceId":"70c0f575-1e18-4254-bdf6-ec8d3218e369","idempotencyKey":"89b26b49-4662-419f-9045-c95e556f91c2"}}
+< HTTP 200
+< {
+  "data" : {
+    "requestPayment" : {
+      "__typename" : "OperationProblem",
+      "code" : "IDEMPOTENCY_CONFLICT",
+      "message" : "This idempotency key was already used for a different request.",
+      "retryAfterSeconds" : null,
+      "fieldProblems" : null
+    }
+  }
+}
+
+## 4. second key on the same invoice
+> POST /graphql   Authorization: Bearer <redacted>   operationName=RequestPayment
+> variables: {"input":{"methodToken":"tok_sim_card_default","invoiceId":"70c0f575-1e18-4254-bdf6-ec8d3218e369","idempotencyKey":"fc36287d-5063-4ea6-b421-b95368199b66"}}
+< HTTP 200
+< {
+  "data" : {
+    "requestPayment" : {
+      "__typename" : "OperationProblem",
+      "code" : "INVOICE_NOT_ELIGIBLE",
+      "message" : "The invoice already has an active payment.",
+      "retryAfterSeconds" : null,
+      "fieldProblems" : null
+    }
+  }
+}
+
+## 5. another merchant's invoice
+> POST /graphql   Authorization: Bearer <redacted>   operationName=RequestPayment
+> variables: {"input":{"methodToken":"tok_sim_card_default","invoiceId":"370fe38c-9b42-45d2-9801-9a7d7dddd470","idempotencyKey":"7e33c94a-2c49-49c4-b16b-074f544cc9d9"}}
+< HTTP 200
+< {
+  "data" : {
+    "requestPayment" : {
+      "__typename" : "OperationProblem",
+      "code" : "NOT_FOUND",
+      "message" : "Invoice not found.",
+      "retryAfterSeconds" : null,
+      "fieldProblems" : null
+    }
+  }
+}

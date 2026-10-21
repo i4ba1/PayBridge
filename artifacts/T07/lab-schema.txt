@@ -1,0 +1,41 @@
+# SHOW TABLES, system_flag and flyway_schema_history in the lab database after the T07 migrations (read with the MySQL root account inside pod mysql-0)
++------------------------+
+| Tables_in_paybridge    |
++------------------------+
+| app_user               |
+| audit_action           |
+| bootstrap_state        |
+| dead_letter_record     |
+| flyway_schema_history  |
+| invoice                |
+| membership             |
+| merchant               |
+| merchant_method        |
+| merchant_quota_setting |
+| method_catalog         |
+| method_token           |
+| outbox                 |
+| payment                |
+| payment_attempt        |
+| payment_event          |
+| payment_request        |
+| processing_task        |
+| reconciliation_case    |
+| reconciliation_note    |
+| system_flag            |
+| webhook_inbox          |
++------------------------+
++-----------------------+------------+
+| flag_key              | flag_value |
++-----------------------+------------+
+| admission.capacity    | OPEN       |
+| admission.maintenance | OFF        |
++-----------------------+------------+
++----------------+---------+-------------------------+-----------------------------------+---------+
+| installed_rank | version | description             | script                            | success |
++----------------+---------+-------------------------+-----------------------------------+---------+
+|              1 | 001     | identity and invoices   | V001__identity_and_invoices.sql   |       1 |
+|              2 | 002     | payments                | V002__payments.sql                |       1 |
+|              3 | 003     | durable work            | V003__durable_work.sql            |       1 |
+|              4 | 004     | support quota and flags | V004__support_quota_and_flags.sql |       1 |
++----------------+---------+-------------------------+-----------------------------------+---------+

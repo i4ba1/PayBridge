@@ -1,0 +1,15 @@
+# run 1 (lab database at version 002, migrate role as pb_migrate over kubectl port-forward)
+2026-10-21T13:04:55.993+07:00  INFO 61696 --- [paybridge-core] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 4 migrations (execution time 00:00.119s)
+2026-10-21T13:04:56.054+07:00  INFO 61696 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `paybridge`: 002
+2026-10-21T13:04:56.106+07:00  INFO 61696 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema `paybridge` to version "003 - durable work"
+2026-10-21T13:04:56.812+07:00  INFO 61696 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Migrating schema `paybridge` to version "004 - support quota and flags"
+2026-10-21T13:04:57.104+07:00  INFO 61696 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 2 migrations to schema `paybridge`, now at version v004 (execution time 00:00.844s)
+2026-10-21T13:04:57.579+07:00  INFO 61696 --- [paybridge-core] [           main] c.p.core.migrate.MigrationRunner         : migrate complete: 2 migration(s) applied, schema version 004, 22 grant statement(s)
+exit=0
+# (note: run 2 was repeated with a fresh port-forward, because the first forward dropped after run 1)
+# run 2 (same database again: nothing to apply)
+2026-10-21T13:05:47.752+07:00  INFO 34740 --- [paybridge-core] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 4 migrations (execution time 00:00.077s)
+2026-10-21T13:05:47.822+07:00  INFO 34740 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `paybridge`: 004
+2026-10-21T13:05:47.831+07:00  INFO 34740 --- [paybridge-core] [           main] o.f.core.internal.command.DbMigrate      : Schema `paybridge` is up to date. No migration necessary.
+2026-10-21T13:05:48.255+07:00  INFO 34740 --- [paybridge-core] [           main] c.p.core.migrate.MigrationRunner         : migrate complete: 0 migration(s) applied, schema version 004, 22 grant statement(s)
+exit=0

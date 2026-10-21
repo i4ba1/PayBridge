@@ -49,22 +49,27 @@ rows for the demo merchants (rate 20, burst 40) are added to the seed, which T04
 ### 4.1 `application` module
 
 - `payment/RequestPaymentCommand(UUID invoiceId, String methodToken, UUID idempotencyKey)`, normalized and validated.
-- `payment/PaymentAdmission`, sealed: `Accepted(paymentId, status, aggregateVersion, replayed)` and `Rejected(Code code, Integer retryAfterSeconds)`.
+- `payment/PaymentAdmission`, sealed: `Accepted(paymentId, status, aggregateVersion, replayed)` and `Rejected(Code code, Integer retryAfterSeconds, List<FieldProblem> fieldProblems)` (`Rejected.of(code, retryAfter)` leaves the problems null).
   Codes: `VALIDATION_ERROR`, `NOT_FOUND`, `IDEMPOTENCY_CONFLICT`, `INVOICE_NOT_ELIGIBLE`, `RATE_LIMITED`, `TEMPORARILY_UNAVAILABLE`.
 - `payment/AdmitPayment`: the use case (section 5).
 - `port/AdmissionStore`:
   - `Optional<Replay> findReplay(merchantId, idempotencyKey)` returning payment id, request hash, status, aggregate version.
-  - `AdmissionResult admit(AdmissionRequest)` running the transaction. Result: `Created`, `Replay` (key race lost), `InvoiceNotFound`,
+  - `AdmissionResult admit(AdmissionRequest)` running the transaction. Result: `Created`, `Duplicate(Replay)` (key race lost; the name `Replay` collides with the `findReplay` record), `InvoiceNotFound`,
     `NotEligible`, `Transient` (deadlock or lock wait).
   - `Optional<MethodChoice> resolveMethod(merchantId, token)` from `method_token`, `method_catalog`, `merchant_method` (all enabled).
-- `port/AdmissionGate`: `void require(merchantId)` throwing `GateClosed(code, retryAfterSeconds)`; `port/SystemFlags` reads the two DB flags
-  (cached `paybridge.admission.flag-cache-ms`, default 1000); `port/ScenarioRunResolver`: `String runFor(merchantId)`.
+- `port/AdmissionGate`: `Optional<Closed> check(merchantId)` (empty when open; `Closed` carries code and retryAfterSeconds); `port/SystemFlags` reads the two DB flags
+  (cached `paybridge.admission.flag-cache-ms`, default 1000); `port/ScenarioRunResolver`: `String runFor(merchantId)`;
+  `port/ConsistencyCheck`: the DMR recovery queries A to C behind a port, with a MySQL adapter, so `core-app` contains no SQL.
 - `ActorContext` already exists in core-app (T05); a copy at the `application` layer would duplicate it, so admission takes plain
   `merchantId`, `userId`, `correlationId` values.
 
 ### 4.2 `adapter-mysql` module
 
-- `MysqlAdmissionStore` implements `AdmissionStore`. `MysqlSystemFlags` implements `SystemFlags`.
+- `MysqlAdmissionStore` implements `AdmissionStore`. `MysqlSystemFlags` implements `SystemFlags`. `MysqlConsistencyCheck` implements `ConsistencyCheck`.
+- `admit` first runs a reject-only, unlocked pre-check: `findReplay` (a hit is `Duplicate`), then a plain consistent read of the invoice
+  pointer (`active_payment_id` set is `NotEligible`, no reservation inserted). Only then does the DMR transaction run, unchanged. The `FOR UPDATE`
+  read inside it stays authoritative; the pre-check only rejects. Without it, concurrent same-key requests deadlocked on `ux_payment_request`
+  (see section 5). The transaction runs under `PROPAGATION_REQUIRES_NEW`, and the audit store (`MANDATORY`) joins it.
 - The `PaymentRequested` event payload is a `PaymentEventEnvelope` serialized with Jackson; payload keys `invoiceId`, `invoiceReference`,
   `methodCode`, `amountMinor`, `currency`, `providerKey` (DMR section 4). No credentials, no method token.
 - `MysqlPaymentStore` (T04) gains no write methods; reads for `payment(id)` stay there.
@@ -76,9 +81,11 @@ rows for the demo merchants (rate 20, burst 40) are added to the seed, which T04
   `Payment` uses decimal strings for `amountMinor` and `version` (the business `aggregate_version`, never the lock counter).
   `attempts` is `[]` and `uncertainty` is `null` until T08 and T12.
 - `payment(id)` loads the payment with the merchant of the actor in the query; a foreign or missing id returns `null`.
-- `graphql/GraphQlLimits`: depth 8, complexity 300 (1 per selected field, plus 5 per list field times `ceil(limit/25)`), document 8 KiB.
-- `admission/AdmissionConsistencyCheck`: runs DMR recovery queries A to C at startup of the `api` role and exposes a health
-  contributor `invoicePointers`. Rows found mean readiness DOWN and an error log with counts only.
+- `graphql/GraphQlLimits`: depth 8, complexity 300 (1 per selected field, plus 5 per list field times `ceil(limit/25)`), document 8 KiB. Depth and complexity are graphql-java instrumentations (HTTP 200 with an `errors` entry); document size is HTTP 413 from a
+  `WebGraphQlInterceptor` with highest precedence, before parsing.
+- `admission/InvoicePointersHealthIndicator`: runs the `ConsistencyCheck` port (DMR recovery queries A to C) once at startup of the `api` role and exposes a health
+  contributor `invoicePointers`. Rows found mean readiness DOWN and an error log with counts only. A failed run (for example an empty schema) is
+  caught and reported DOWN with `check=failed`; the check does not run again, so readiness stays DOWN until restart.
 - Properties (all DMR section 10): `paybridge.admission.enabled`, `.lock-wait-timeout-seconds`, `.method-token-max-length`,
   `.default-scenario-run-id`, `.flag-cache-ms`.
 
@@ -89,7 +96,7 @@ requestPayment(input)
   authorize                                  (T05: OPERATOR in the signed merchant)
   command = validate(input)                  UUIDs; token <= 128 chars and on the allow-list; else VALIDATION_ERROR
   hash = SHA-256( "REQUEST_PAYMENT" | invoiceId | methodToken )  canonical UTF-8, fields separated by a newline
-  replay = store.findReplay(merchant, key)   autocommit, before every gate
+  replay = store.findReplay(merchant, key)   autocommit, before every gate (the store repeats this and an unlocked pointer read as a reject-only pre-check)
      equal hash   -> Accepted(replayed = true), current status and aggregate_version
      other hash   -> Rejected(IDEMPOTENCY_CONFLICT)
   gates, in this order: paybridge.admission.enabled, flag admission.maintenance = ON, flag admission.capacity = CLOSED,
@@ -104,8 +111,8 @@ requestPayment(input)
 
 The transaction (statement order is the lock order, DMR section 2):
 
-1. `SET SESSION innodb_lock_wait_timeout = 3`, `START TRANSACTION`.
-2. `INSERT payment_request` (reservation). Error 1062: roll back, read the original in a new transaction, return it as `Replay`.
+1. `START TRANSACTION` (`REQUIRES_NEW`), then `SET SESSION innodb_lock_wait_timeout = 3` as the first statement inside the Spring transaction; the previous value is restored in `beforeCompletion`, so the pooled connection is left clean.
+2. `INSERT payment_request` (reservation). Error 1062: roll back, read the original in a new transaction, return it as `Duplicate`.
 3. `SELECT … FROM invoice WHERE id = ? AND merchant_id = ? FOR UPDATE`. No row: `InvoiceNotFound` (rollback). `active_payment_id` not null: `NotEligible` (rollback).
 4. `INSERT payment` (REQUESTED, `aggregate_version` 1, `version` 0, `provider_key` `pbk-<id>`, `scenario_run_id`, amount and currency copied from the invoice).
 5. `UPDATE invoice SET active_payment_id = ?, version = version + 1 WHERE active_payment_id IS NULL` (expects 1 row).
