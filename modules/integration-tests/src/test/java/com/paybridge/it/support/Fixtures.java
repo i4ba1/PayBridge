@@ -35,6 +35,16 @@ public final class Fixtures {
         return id;
     }
 
+    /** An enabled method, token and merchant link. INSERT IGNORE: the catalog and token rows are shared between merchants. */
+    public static void method(JdbcTemplate jdbc, String merchantId, String code, String token) {
+        jdbc.update("INSERT IGNORE INTO method_catalog (method_code, display_name, settlement, enabled) "
+                + "VALUES (?, ?, 'IMMEDIATE', 1)", code, code);
+        jdbc.update("INSERT IGNORE INTO method_token (token, method_code, description, enabled) VALUES (?, ?, '', 1)",
+                token, code);
+        jdbc.update("INSERT IGNORE INTO merchant_method (merchant_id, method_code, enabled) VALUES (?, ?, 1)",
+                merchantId, code);
+    }
+
     public static String payment(JdbcTemplate jdbc, String merchantId, String invoiceId, String userId, String status) {
         String id = uuid();
         jdbc.update("INSERT INTO payment (id, merchant_id, invoice_id, method_code, method_token, amount_minor, "
